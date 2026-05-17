@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"/c/Program Files/Java/jdk-25/bin/javac.exe\" -d bin-check --module-path \"/c/Program Files/Java/javafx-sdk-21.0.11/lib\" --add-modules javafx.controls src/application/Stock.java src/application/Portfolio.java src/application/Market.java src/application/components/PanelCard.java src/application/components/NewsPanel.java src/application/components/ChartPanel.java src/application/components/StockListPanel.java src/application/components/OrderPanel.java src/application/components/WalletPanel.java src/application/Main.java)",
+      "Bash(\"/c/Program Files/Java/jdk-25/bin/java.exe\" --module-path \"/c/Program Files/Java/javafx-sdk-21.0.11/lib\" --add-modules javafx.controls -cp bin-check application.Main)",
+      "Bash(tasklist)"
+    ]
+  }
+}

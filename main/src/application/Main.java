@@ -40,10 +40,15 @@ public class Main extends Application {
 
 	private StackPane appRoot;
 	private Pane zoomLayer;
+	private Market market;
+	private Portfolio portfolio;
 
 	@Override
 	public void start(Stage primaryStage) {
 		try {
+			market = new Market();
+			portfolio = new Portfolio();
+
 			BorderPane root = new BorderPane();
 			root.setPadding(new Insets(18));
 			root.setStyle(
@@ -55,17 +60,10 @@ public class Main extends Application {
 			);
 
 			NewsPanel newsPanel = new NewsPanel(560, COLUMN_H);
-			ChartPanel chartPanel = new ChartPanel(760, CHART_H);
+			ChartPanel chartPanel = new ChartPanel(760, CHART_H, market);
 
 			newsPanel.setNewsListener((title, content, effect, turn) -> {
-				System.out.println("뉴스 변경");
-				System.out.println("제목: " + title);
-				System.out.println("내용: " + content);
-				System.out.println("영향: " + effect);
-				System.out.println("턴: " + turn);
-
-				// 차트 담당자가 나중에 연결
-				// chartPanel.applyNewsEffect(effect);
+				market.applyNewsEffect(effect);
 			});
 
 			newsPanel.setImageClickHandler(imageView -> {
@@ -261,7 +259,7 @@ public class Main extends Application {
 		HBox center = new HBox(
 				18,
 				leftColumn,
-				new StockListPanel(520, COLUMN_H),
+				new StockListPanel(520, COLUMN_H, market),
 				newsPanel
 		);
 
@@ -271,8 +269,8 @@ public class Main extends Application {
 	}
 
 	private VBox buildLeftColumn(ChartPanel chart) {
-		OrderPanel order = new OrderPanel(370, BOTTOM_H);
-		WalletPanel wallet = new WalletPanel(370, BOTTOM_H);
+		OrderPanel order = new OrderPanel(370, BOTTOM_H, market, portfolio);
+		WalletPanel wallet = new WalletPanel(370, BOTTOM_H, market, portfolio);
 
 		HBox bottom = new HBox(GAP, order, wallet);
 		VBox left = new VBox(GAP, chart, bottom);
