@@ -92,19 +92,19 @@ public class NewsPanel extends Pane {
 
 	// 나중에 사진 넣을 때 여기 경로만 바꾸면 됨
 	private final String[] normalImagePaths = {
-			"C:/Users/kim/Downloads/p1.png",
-			"C:/Users/kim/Downloads/p1.png",
-			"C:/Users/kim/Downloads/p1.png",
-			"C:/Users/kim/Downloads/p1.png",
-			"C:/Users/kim/Downloads/p1.png",
-			"C:/Users/kim/Downloads/p1.png"
+			"/Newsimg/p1.png",
+			"/Newsimg/p1.png",
+			"/Newsimg/p1.png",
+			"/Newsimg/p1.png",
+			"/Newsimg/p1.png",
+			"/Newsimg/p1.png"
 	};
 
 	private final String[] crisisImagePaths = {
-			"C:/Users/kim/Downloads/p2.png",
-			"C:/Users/kim/Downloads/p3.png",
-			"C:/Users/kim/Downloads/p2.png",
-			"C:/Users/kim/Downloads/p3.png"
+			"/Newsimg/p2.png",
+			"/Newsimg/p3.png",
+			"/Newsimg/p4.png",
+			"/Newsimg/p5.png"
 	};
 
 	public NewsPanel(double width, double height) {
@@ -262,13 +262,18 @@ public class NewsPanel extends Pane {
 	}
 
 	private void loadNewsImage(String path) {
-		try {
-			Image image = new Image("file:///" + path.replace("\\", "/"));
-			newsImage.setImage(image);
-		} catch (Exception e) {
-			newsImage.setImage(null);
-			System.out.println("이미지 경로를 확인하세요: " + path);
-		}
+	    try {
+	        Image image = new Image(
+	            getClass().getResource(path).toExternalForm()
+	        );
+
+	        newsImage.setImage(image);
+
+	    } catch (Exception e) {
+	        newsImage.setImage(null);
+	        System.out.println("이미지 경로 오류: " + path);
+	        e.printStackTrace();
+	    }
 	}
 
 	public void setNewsListener(NewsListener listener) {
