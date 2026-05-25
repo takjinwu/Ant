@@ -29,6 +29,7 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 import javafx.util.Duration;
 
 public class Main extends Application {
@@ -40,10 +41,16 @@ public class Main extends Application {
 
 	private StackPane appRoot;
 	private Pane zoomLayer;
+	private String uiFontFamily = Font.getDefault().getFamily();
 
 	@Override
 	public void start(Stage primaryStage) {
 		try {
+			// ── Moneygraphy Rounded 폰트 로드 (Canvas 렌더링용) ──
+			Font.loadFont(getClass().getResourceAsStream("fonts/Moneygraphy-Rounded.ttf"), 12);
+			Font loadedFont = Font.loadFont(getClass().getResourceAsStream("fonts/Moneygraphy-Rounded.ttf"), 34);
+			if (loadedFont != null) uiFontFamily = loadedFont.getFamily();
+
 			BorderPane root = new BorderPane();
 			root.setPadding(new Insets(18));
 			root.setStyle(
@@ -83,12 +90,10 @@ public class Main extends Application {
 			Scene scene = new Scene(appRoot, 1920, 1080);
 			scene.getStylesheets().add(getClass().getResource("application.css").toExternalForm());
 
+			primaryStage.initStyle(StageStyle.UNDECORATED);
 			primaryStage.setTitle("개미증권");
 			primaryStage.setScene(scene);
-
-			// 실행 시 전체화면
-			primaryStage.setFullScreen(true);
-			primaryStage.setFullScreenExitHint("");
+			primaryStage.setMaximized(true);
 
 			primaryStage.show();
 
@@ -102,7 +107,7 @@ public class Main extends Application {
 	private void showStartNotice(NewsPanel newsPanel) {
 		Label notice = new Label("10초 후 시작됩니다");
 
-		notice.setFont(Font.font("맑은 고딕", FontWeight.EXTRA_BOLD, 34));
+		notice.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 34));
 		notice.setTextFill(Color.WHITE);
 		notice.setStyle(
 			"-fx-background-color: rgba(0, 0, 0, 0.58);" +
