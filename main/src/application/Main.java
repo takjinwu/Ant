@@ -6,28 +6,40 @@ import application.components.OrderPanel;
 import application.components.PanelCard;
 import application.components.StockListPanel;
 import application.components.WalletPanel;
+import javafx.animation.Interpolator;
+import javafx.animation.KeyFrame;
+import javafx.animation.KeyValue;
+import javafx.animation.Timeline;
 import javafx.application.Application;
+import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
+import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 
 public class Main extends Application {
 
-	private static final String FONT = "맑은 고딕";
-
-	private static final double CHART_H = 360;
-	private static final double BOTTOM_H = 180;
-	private static final double GAP = 12;
+	private static final double CHART_H = 620;
+	private static final double BOTTOM_H = 260;
+	private static final double GAP = 18;
 	private static final double COLUMN_H = CHART_H + GAP + BOTTOM_H;
+
+	private StackPane appRoot;
+	private Pane zoomLayer;
 
 	@Override
 	public void start(Stage primaryStage) {
@@ -42,51 +54,231 @@ public class Main extends Application {
 					"#9B005C 100%);"
 			);
 
-			root.setTop(buildTop());
-			root.setCenter(buildCenter());
+			NewsPanel newsPanel = new NewsPanel(560, COLUMN_H);
+			ChartPanel chartPanel = new ChartPanel(760, CHART_H);
 
-			Scene scene = new Scene(root, 1200, 700);
+			newsPanel.setNewsListener((title, content, effect, turn) -> {
+				System.out.println("뉴스 변경");
+				System.out.println("제목: " + title);
+				System.out.println("내용: " + content);
+				System.out.println("영향: " + effect);
+				System.out.println("턴: " + turn);
+
+				// 차트 담당자가 나중에 연결
+				// chartPanel.applyNewsEffect(effect);
+			});
+
+			newsPanel.setImageClickHandler(imageView -> {
+				showImageZoom(imageView);
+			});
+
+			root.setTop(buildTop(primaryStage, newsPanel));
+			root.setCenter(buildCenter(newsPanel, chartPanel));
+
+			zoomLayer = new Pane();
+			zoomLayer.setPickOnBounds(false);
+
+			appRoot = new StackPane(root, zoomLayer);
+
+			Scene scene = new Scene(appRoot, 1920, 1080);
 			scene.getStylesheets().add(getClass().getResource("application.css").toExternalForm());
+
 			primaryStage.setTitle("개미증권");
 			primaryStage.setScene(scene);
+
+			// 실행 시 전체화면
+			primaryStage.setFullScreen(true);
+			primaryStage.setFullScreenExitHint("");
+
 			primaryStage.show();
+
+			showStartNotice(newsPanel);
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 
-	private HBox buildTop() {
+	private void showStartNotice(NewsPanel newsPanel) {
+		Label notice = new Label("10초 후 시작됩니다");
+
+		notice.setFont(Font.font("맑은 고딕", FontWeight.EXTRA_BOLD, 34));
+		notice.setTextFill(Color.WHITE);
+		notice.setStyle(
+			"-fx-background-color: rgba(0, 0, 0, 0.58);" +
+			"-fx-background-radius: 22;" +
+			"-fx-padding: 20 42 20 42;" +
+			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 20, 0.3, 0, 4);"
+		);
+
+		StackPane.setAlignment(notice, Pos.TOP_CENTER);
+		StackPane.setMargin(notice, new Insets(30, 0, 0, 0));
+
+		appRoot.getChildren().add(notice);
+
+		final int[] count = {10};
+
+		Timeline countdown = new Timeline(
+			new KeyFrame(Duration.seconds(1), e -> {
+				count[0]--;
+
+				if (count[0] > 0) {
+					notice.setText(count[0] + "초 후 시작됩니다");
+				} else {
+					appRoot.getChildren().remove(notice);
+					newsPanel.startGame();
+				}
+			})
+		);
+
+		countdown.setCycleCount(10);
+		countdown.play();
+	}
+
+	private void showImageZoom(ImageView sourceImageView) {
+		if (sourceImageView.getImage() == null) {
+			return;
+		}
+
+		Bounds sceneBounds = sourceImageView.localToScene(sourceImageView.getBoundsInLocal());
+
+		ImageView zoomImage = new ImageView(sourceImageView.getImage());
+		zoomImage.setPreserveRatio(false);
+		zoomImage.setFitWidth(sceneBounds.getWidth());
+		zoomImage.setFitHeight(sceneBounds.getHeight());
+		zoomImage.setLayoutX(sceneBounds.getMinX());
+		zoomImage.setLayoutY(sceneBounds.getMinY());
+		zoomImage.setStyle(
+			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.75), 45, 0.4, 0, 0);"
+		);
+
+		zoomLayer.setPickOnBounds(true);
+		zoomLayer.setStyle("-fx-background-color: rgba(0,0,0,0.45);");
+		zoomLayer.getChildren().add(zoomImage);
+
+		double targetW = 1100;
+		double targetH = 650;
+		double targetX = (appRoot.getWidth() - targetW) / 2.0;
+		double targetY = (appRoot.getHeight() - targetH) / 2.0;
+
+		Timeline open = new Timeline(
+			new KeyFrame(Duration.millis(350),
+				new KeyValue(zoomImage.layoutXProperty(), targetX, Interpolator.EASE_BOTH),
+				new KeyValue(zoomImage.layoutYProperty(), targetY, Interpolator.EASE_BOTH),
+				new KeyValue(zoomImage.fitWidthProperty(), targetW, Interpolator.EASE_BOTH),
+				new KeyValue(zoomImage.fitHeightProperty(), targetH, Interpolator.EASE_BOTH)
+			)
+		);
+
+		open.play();
+
+		zoomImage.setOnMouseClicked(e -> {
+			Timeline close = new Timeline(
+				new KeyFrame(Duration.millis(350),
+					new KeyValue(zoomImage.layoutXProperty(), sceneBounds.getMinX(), Interpolator.EASE_BOTH),
+					new KeyValue(zoomImage.layoutYProperty(), sceneBounds.getMinY(), Interpolator.EASE_BOTH),
+					new KeyValue(zoomImage.fitWidthProperty(), sceneBounds.getWidth(), Interpolator.EASE_BOTH),
+					new KeyValue(zoomImage.fitHeightProperty(), sceneBounds.getHeight(), Interpolator.EASE_BOTH)
+				)
+			);
+
+			close.setOnFinished(event -> {
+				zoomLayer.getChildren().clear();
+				zoomLayer.setStyle("");
+				zoomLayer.setPickOnBounds(false);
+			});
+
+			close.play();
+		});
+	}
+
+	private HBox buildTop(Stage stage, NewsPanel newsPanel) {
 		PanelCard brand = new PanelCard("개미증권", 26, FontWeight.EXTRA_BOLD, 280, 56) {};
 
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 
 		Button fastForward = new Button("▶▶");
-		fastForward.setFont(Font.font(FONT, FontWeight.EXTRA_BOLD, 22));
-		fastForward.setPrefSize(80, 56);
-		fastForward.getStyleClass().add("ghost-button");
+		fastForward.setStyle(
+			"-fx-background-color: rgba(255,255,255,0.18);" +
+			"-fx-text-fill: white;" +
+			"-fx-font-size: 18px;" +
+			"-fx-font-weight: bold;" +
+			"-fx-background-radius: 18;" +
+			"-fx-padding: 10 22 10 22;" +
+			"-fx-border-color: rgba(255,255,255,0.35);" +
+			"-fx-border-radius: 18;"
+		);
+		fastForward.setOnAction(e -> newsPanel.nextTurn());
 
-		HBox top = new HBox(12, brand, spacer, fastForward);
+		Button exitButton = new Button("종료");
+		exitButton.setStyle(
+			"-fx-background-color: linear-gradient(to right, #ff416c, #ff4b2b);" +
+			"-fx-text-fill: white;" +
+			"-fx-font-size: 18px;" +
+			"-fx-font-weight: bold;" +
+			"-fx-background-radius: 18;" +
+			"-fx-padding: 10 26 10 26;" +
+			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 12, 0.3, 0, 3);"
+		);
+
+		exitButton.setOnMouseEntered(e -> {
+			exitButton.setStyle(
+				"-fx-background-color: linear-gradient(to right, #ff6a88, #ff7043);" +
+				"-fx-text-fill: white;" +
+				"-fx-font-size: 18px;" +
+				"-fx-font-weight: bold;" +
+				"-fx-background-radius: 18;" +
+				"-fx-padding: 10 26 10 26;" +
+				"-fx-effect: dropshadow(gaussian, rgba(255,75,43,0.55), 18, 0.45, 0, 4);"
+			);
+		});
+
+		exitButton.setOnMouseExited(e -> {
+			exitButton.setStyle(
+				"-fx-background-color: linear-gradient(to right, #ff416c, #ff4b2b);" +
+				"-fx-text-fill: white;" +
+				"-fx-font-size: 18px;" +
+				"-fx-font-weight: bold;" +
+				"-fx-background-radius: 18;" +
+				"-fx-padding: 10 26 10 26;" +
+				"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 12, 0.3, 0, 3);"
+			);
+		});
+
+		exitButton.setOnAction(e -> stage.close());
+
+		HBox top = new HBox(12, brand, spacer, fastForward, exitButton);
 		top.setPadding(new Insets(0, 0, 14, 0));
 		top.setAlignment(Pos.CENTER_LEFT);
+
 		return top;
 	}
 
-	private HBox buildCenter() {
-		HBox center = new HBox(14, buildLeftColumn(), new StockListPanel(220, COLUMN_H), new NewsPanel(380, COLUMN_H));
+	private HBox buildCenter(NewsPanel newsPanel, ChartPanel chartPanel) {
+		VBox leftColumn = buildLeftColumn(chartPanel);
+
+		HBox center = new HBox(
+				18,
+				leftColumn,
+				new StockListPanel(520, COLUMN_H),
+				newsPanel
+		);
+
 		center.setAlignment(Pos.TOP_LEFT);
+
 		return center;
 	}
 
-	private VBox buildLeftColumn() {
-		ChartPanel chart = new ChartPanel(440, CHART_H);
+	private VBox buildLeftColumn(ChartPanel chart) {
+		OrderPanel order = new OrderPanel(370, BOTTOM_H);
+		WalletPanel wallet = new WalletPanel(370, BOTTOM_H);
 
-		OrderPanel order = new OrderPanel(214, BOTTOM_H);
-		WalletPanel wallet = new WalletPanel(214, BOTTOM_H);
 		HBox bottom = new HBox(GAP, order, wallet);
-
 		VBox left = new VBox(GAP, chart, bottom);
+
 		left.setPrefHeight(COLUMN_H);
+
 		return left;
 	}
 
