@@ -41,11 +41,13 @@ public class Main extends Application {
 
 	private StackPane appRoot;
 	private Pane zoomLayer;
+	
 	private String uiFontFamily = Font.getDefault().getFamily();
 
 	@Override
 	public void start(Stage primaryStage) {
 		try {
+			
 			// ── Moneygraphy Rounded 폰트 로드 (Canvas 렌더링용) ──
 			Font.loadFont(getClass().getResourceAsStream("fonts/Moneygraphy-Rounded.ttf"), 12);
 			Font loadedFont = Font.loadFont(getClass().getResourceAsStream("fonts/Moneygraphy-Rounded.ttf"), 34);

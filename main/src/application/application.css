@@ -1,5 +1,17 @@
 .root {
-	-fx-font-family: "맑은 고딕";
+    -fx-font-family: "Moneygraphy Rounded";
+}
+
+.label {
+    -fx-font-family: "Moneygraphy Rounded";
+}
+
+.button {
+    -fx-font-family: "Moneygraphy Rounded";
+}
+
+.text-field {
+    -fx-font-family: "Moneygraphy Rounded";
 }
 
 /* Glassmorphism card — subtle two-tone gradient + soft border + drop shadow */
