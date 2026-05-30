@@ -41,7 +41,7 @@ public class ChartPanel extends VBox {
 
     // ── 샘플 데이터: open, high, low, close, volume ──────────────
     // TODO: 뉴스 이벤트 연결 시 이 배열을 외부 List<double[]>로 교체
-    private static final double[][] DATA = {
+    private static final double[][] SAMPLE_SERIES = {
         {60000, 65000, 58000, 62000,  900000},
         {62000, 67000, 61000, 66000, 1100000},
         {66000, 70000, 64000, 65000,  800000},
@@ -64,6 +64,9 @@ public class ChartPanel extends VBox {
         {81000, 85000, 79000, 83000, 1300000},
     };
 
+    /** 현재 표시 중인 종목의 캔들 시리즈 (종목 선택 시 교체됨) */
+    private double[][] data = SAMPLE_SERIES;
+
     // ── 내부 상태 ──────────────────────────────────────────────────
     private final double panelW;
     private final double candleH;
@@ -71,6 +74,8 @@ public class ChartPanel extends VBox {
 
     private Canvas  candleCanvas;
     private Canvas  volCanvas;
+    private Label   badge;         // 종목 뱃지
+    private Label   nameLabel;     // 종목명
     private Label   priceLabel;    // ❸ 현재가격 (대형)
     private Label   tooltipBox;    // ❷ OHLCV 툴팁
     private boolean showCandle = true;
@@ -112,8 +117,8 @@ public class ChartPanel extends VBox {
             "-fx-border-width: 0 0 1 0;"
         );
 
-        // ── SAMSUNG 뱃지 ──
-        Label badge = new Label("SAMSUNG");
+        // ── 종목 뱃지 ──
+        badge = new Label("SAMSUNG");
         badge.setStyle(
             "-fx-background-color: #1428A0;" +
             "-fx-text-fill: white;" +
@@ -125,7 +130,7 @@ public class ChartPanel extends VBox {
         );
 
         // ── 종목명 + 현재가격 (수직 배치) ──
-        Label nameLabel = new Label("삼성전자  005930");
+        nameLabel = new Label("삼성전자  005930");
         nameLabel.setStyle(
             "-fx-text-fill: rgba(255,255,255,0.75);" +
             "-fx-font-family: '맑은 고딕';" +
@@ -261,9 +266,102 @@ public class ChartPanel extends VBox {
      * @param effect 퍼센트 단위 등락 (예: +5.0, -3.0)
      */
     public void applyNewsEffect(double effect) {
-        // TODO: DATA를 외부 List<double[]>로 교체하고 여기서 append/update
+        // TODO: data를 외부 List<double[]>로 교체하고 여기서 append/update
         System.out.println("[ChartPanel] 뉴스 효과: " + effect + "%");
         redraw();
+    }
+
+    /**
+     * 주식 목록에서 종목 선택 시 호출 — 헤더(뱃지/종목명/현재가)와 차트를 해당 종목으로 교체.
+     * @param name  종목명
+     * @param price 현재 주당 가격 (마지막 캔들 종가가 이 값에 맞춰짐)
+     */
+    public void showStock(String name, long price) {
+        this.data = generateSeries(name, price);
+
+        // ── 뱃지 ──
+        boolean darkText = "카카오".equals(name);     // 카카오 노란색 → 어두운 글자
+        badge.setText(name);
+        badge.setStyle(
+            "-fx-background-color: " + brandColor(name) + ";" +
+            "-fx-text-fill: " + (darkText ? "#1A1A1A" : "white") + ";" +
+            "-fx-font-family: '맑은 고딕';" +
+            "-fx-font-weight: bold;" +
+            "-fx-font-size: 12px;" +
+            "-fx-padding: 6 10 6 10;" +
+            "-fx-background-radius: 5;"
+        );
+
+        // ── 종목명 ──
+        nameLabel.setText(name);
+
+        // ── 현재가 (상승=빨강 / 하락=파랑) ──
+        boolean bull = data[data.length - 1][3] >= data[0][0];
+        priceLabel.setText(String.format("%,d원", price));
+        priceLabel.setStyle(
+            "-fx-text-fill: " + (bull ? "#ff6b6b" : "#4A9EFF") + ";" +
+            "-fx-font-family: '맑은 고딕';" +
+            "-fx-font-weight: bold;" +
+            "-fx-font-size: 24px;"
+        );
+
+        // 커서/툴팁 초기화 후 다시 그림
+        mouseX = -1;
+        mouseY = -1;
+        if (tooltipBox != null) tooltipBox.setVisible(false);
+        redraw();
+    }
+
+    /**
+     * 종목별 캔들 시리즈 생성.
+     * ─ 종목명 기반 시드로 매번 동일한 차트가 재현되며, 마지막 종가는 price에 정확히 일치.
+     * ─ 추후 실제 시세/뉴스 데이터가 생기면 이 메서드를 대체하면 됨.
+     */
+    private double[][] generateSeries(String name, long price) {
+        final int n = SAMPLE_SERIES.length;
+        double[][] d = new double[n][5];
+        java.util.Random r = new java.util.Random(name.hashCode() * 31L + price);
+
+        double cur = price * (0.80 + r.nextDouble() * 0.30);   // 시작가: 현재가의 80~110%
+        for (int i = 0; i < n; i++) {
+            double open  = cur;
+            double drift = (r.nextDouble() - 0.45) * 0.06;      // ±6%, 소폭 상승 편향
+            double close = open * (1 + drift);
+            double high  = Math.max(open, close) * (1 + r.nextDouble() * 0.025);
+            double low   = Math.min(open, close) * (1 - r.nextDouble() * 0.025);
+            double vol   = 500_000 + r.nextDouble() * 1_500_000;
+            d[i] = new double[]{open, high, low, close, vol};
+            cur = close;
+        }
+
+        // 마지막 종가를 현재가에 정확히 맞추도록 가격축 전체 보정
+        double factor = price / d[n - 1][3];
+        for (double[] row : d) {
+            row[0] *= factor;
+            row[1] *= factor;
+            row[2] *= factor;
+            row[3] *= factor;
+        }
+        return d;
+    }
+
+    /** 종목별 뱃지 브랜드 컬러 */
+    private static String brandColor(String name) {
+        switch (name) {
+            case "삼성전자":          return "#1428A0";
+            case "SK하이닉스":        return "#EA002C";
+            case "셀트리온":          return "#00A0E9";
+            case "유한양행":          return "#0067AC";
+            case "한화에어로스페이스": return "#F37321";
+            case "LIG넥스원":         return "#003DA5";
+            case "LG에너지솔루션":     return "#A50034";
+            case "에코프로비엠":       return "#0BA14B";
+            case "네이버":            return "#03C75A";
+            case "카카오":            return "#FEE500";
+            case "현대차":            return "#002C5F";
+            case "기아":              return "#05141F";
+            default:                  return "#3A4A8A";
+        }
     }
 
     // ────────────────────────────────────────────────────────────
@@ -276,7 +374,7 @@ public class ChartPanel extends VBox {
 
     private double[] getPriceRange() {
         double minP = Double.MAX_VALUE, maxP = -Double.MAX_VALUE;
-        for (double[] d : DATA) {
+        for (double[] d : data) {
             minP = Math.min(minP, d[2]);
             maxP = Math.max(maxP, d[1]);
         }
@@ -292,7 +390,7 @@ public class ChartPanel extends VBox {
     private void drawCandleChart() {
         GraphicsContext gc = candleCanvas.getGraphicsContext2D();
         double cw = candleCanvas.getWidth(), ch = candleCanvas.getHeight();
-        int n = DATA.length;
+        int n = data.length;
 
         gc.clearRect(0, 0, cw, ch);
 
@@ -319,10 +417,10 @@ public class ChartPanel extends VBox {
         // ── 캔들 or 라인 ──
         if (showCandle) {
             for (int i = 0; i < n; i++) {
-                double open  = DATA[i][0];
-                double high  = DATA[i][1];
-                double low   = DATA[i][2];
-                double close = DATA[i][3];
+                double open  = data[i][0];
+                double high  = data[i][1];
+                double low   = data[i][2];
+                double close = data[i][3];
                 boolean bull = close >= open;
 
                 Color body = bull ? Color.web("#E8534A") : Color.web("#4A9EFF");
@@ -350,7 +448,7 @@ public class ChartPanel extends VBox {
             gc.beginPath();
             gc.moveTo(PAD_L + 0.5 * barW, ch);
             for (int i = 0; i < n; i++)
-                gc.lineTo(PAD_L + (i + 0.5) * barW, priceToY(DATA[i][3], minP, maxP, ch));
+                gc.lineTo(PAD_L + (i + 0.5) * barW, priceToY(data[i][3], minP, maxP, ch));
             gc.lineTo(PAD_L + (n - 0.5) * barW, ch);
             gc.closePath();
             gc.setFill(Color.web("#4A9EFF", 0.10));
@@ -359,7 +457,7 @@ public class ChartPanel extends VBox {
             gc.beginPath();
             for (int i = 0; i < n; i++) {
                 double x = PAD_L + (i + 0.5) * barW;
-                double y = priceToY(DATA[i][3], minP, maxP, ch);
+                double y = priceToY(data[i][3], minP, maxP, ch);
                 if (i == 0) gc.moveTo(x, y); else gc.lineTo(x, y);
             }
             gc.stroke();
@@ -392,13 +490,13 @@ public class ChartPanel extends VBox {
     private void drawVolChart() {
         GraphicsContext gc = volCanvas.getGraphicsContext2D();
         double cw = volCanvas.getWidth(), ch = volCanvas.getHeight();
-        int n = DATA.length;
+        int n = data.length;
 
         gc.clearRect(0, 0, cw, ch);
         // 배경 투명 — 메인 그라데이션 배경이 그대로 비침
 
         double barW   = (cw - AXIS_W - PAD_L - PAD_R) / n;
-        double maxVol = Arrays.stream(DATA).mapToDouble(d -> d[4]).max().orElse(1);
+        double maxVol = Arrays.stream(data).mapToDouble(d -> d[4]).max().orElse(1);
 
         // 격자
         gc.setStroke(Color.web("#ffffff", 0.06));
@@ -410,9 +508,9 @@ public class ChartPanel extends VBox {
 
         // 거래량 스틱
         for (int i = 0; i < n; i++) {
-            boolean bull = DATA[i][3] >= DATA[i][0];
+            boolean bull = data[i][3] >= data[i][0];
             gc.setFill(bull ? Color.web("#E8534A", 0.75) : Color.web("#4A9EFF", 0.75));
-            double bh = (DATA[i][4] / maxVol) * (ch - 4);
+            double bh = (data[i][4] / maxVol) * (ch - 4);
             double x  = PAD_L + i * barW + barW * 0.20;
             gc.fillRect(x, ch - bh, Math.max(barW * 0.60, 2), bh);
         }
@@ -438,14 +536,14 @@ public class ChartPanel extends VBox {
     // ────────────────────────────────────────────────────────────
     private void updateTooltip(double mx, double my) {
         double cw   = candleCanvas.getWidth();
-        double barW = (cw - AXIS_W - PAD_L - PAD_R) / DATA.length;
+        double barW = (cw - AXIS_W - PAD_L - PAD_R) / data.length;
         int idx = (int)((mx - PAD_L) / barW);
-        if (idx < 0 || idx >= DATA.length) {
+        if (idx < 0 || idx >= data.length) {
             tooltipBox.setVisible(false);
             return;
         }
 
-        double[] d = DATA[idx];
+        double[] d = data[idx];
 
         // ❷ 툴팁 — 시가/고가/저가/종가/거래량 모두 표시
         tooltipBox.setText(String.format(

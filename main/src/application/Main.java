@@ -286,7 +286,10 @@ public class Main extends Application {
 
 		// ── 패널 간 연동 ──
 		order.setWallet(wallet);                          // 주문 → 지갑(체결/잔액)
-		stockList.setOnStockSelected(order::setSelectedStock); // 종목 선택 → 주문 패널
+		stockList.setOnStockSelected((name, price) -> {   // 종목 선택 → 주문 패널 + 차트
+			order.setSelectedStock(name, price);
+			chartPanel.showStock(name, price);
+		});
 
 		VBox leftColumn = buildLeftColumn(chartPanel, order, wallet);
 
