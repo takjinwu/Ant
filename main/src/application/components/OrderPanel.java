@@ -135,6 +135,7 @@ public class OrderPanel extends VBox {
 
         HBox orderBtnBox = new HBox(10, buyButton, sellButton);
         orderBtnBox.setAlignment(Pos.CENTER);
+        VBox.setMargin(orderBtnBox, new Insets(10, 0, 0, 0));
 
         // ── 피드백 라벨 ──
         feedbackLabel = new Label("");
