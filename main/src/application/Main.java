@@ -11,6 +11,7 @@ import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
 import javafx.animation.Timeline;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -41,6 +42,7 @@ public class Main extends Application {
 
 	private StackPane appRoot;
 	private Pane zoomLayer;
+	private StockListPanel stockListRef;   // ← 추가: start()에서 selectFirst() 호출용
 	
 	private String uiFontFamily = Font.getDefault().getFamily();
 
@@ -73,8 +75,7 @@ public class Main extends Application {
 				System.out.println("영향: " + effect);
 				System.out.println("턴: " + turn);
 
-				// 차트 담당자가 나중에 연결
-				// chartPanel.applyNewsEffect(effect);
+				chartPanel.addCandle(effect);  // 턴마다 새 캔들 추가
 			});
 
 			newsPanel.setImageClickHandler(imageView -> {
@@ -98,6 +99,12 @@ public class Main extends Application {
 			primaryStage.setMaximized(true);
 
 			primaryStage.show();
+
+			// ── [핵심 수정] 화면이 뜬 직후 첫 번째 종목(삼성전자)을 자동 선택해
+			//    ChartPanel 초기 차트를 StockListPanel 추세 데이터와 일치시킴 ──
+			Platform.runLater(() -> {
+				if (stockListRef != null) stockListRef.selectFirst();
+			});
 
 			showStartNotice(newsPanel);
 
@@ -285,6 +292,7 @@ public class Main extends Application {
 		OrderPanel order = new OrderPanel(370, BOTTOM_H);
 		WalletPanel wallet = new WalletPanel(370, BOTTOM_H);
 		StockListPanel stockList = new StockListPanel(520, COLUMN_H);
+		stockListRef = stockList;   // ← 추가: start()에서 접근하기 위해 저장
 
 		// ── 패널 간 연동 ──
 		order.setWallet(wallet);                          // 주문 → 지갑(체결/잔액)

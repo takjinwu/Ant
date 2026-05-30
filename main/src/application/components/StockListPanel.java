@@ -4,11 +4,13 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.effect.DropShadow;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 
@@ -20,23 +22,17 @@ import java.util.function.BiConsumer;
  * StockListPanel
  * ─ 거래 가능한 종목 목록을 표시하는 패널
  * ─ 종목 행을 클릭하면 선택 리스너(setOnStockSelected)로 종목명/현재가를 전달
- *   → OrderPanel.setSelectedStock(name, price) 에 연결해서 사용
- * ─ WalletPanel / OrderPanel 과 동일한 글래스 카드 스타일
+ * → OrderPanel.setSelectedStock(name, price) 에 연결해서 사용
+ * ─ 종목명 앞 상태 점: 상승(빨강), 하락(파랑)
  */
 public class StockListPanel extends VBox {
 
-    // ── 종목명 → 현재가(원) ─────────────────────────────────
-    // 이름은 정식 종목명으로 교정해서 등록 (한화에어로스페이스, LIG넥스원 등)
     private final Map<String, Long> stocks = new LinkedHashMap<>();
-
-    // ── 선택 콜백 (종목명, 현재가) ───────────────────────────
     private BiConsumer<String, Long> onStockSelected = null;
 
-    // ── UI 요소 ────────────────────────────────────────────
     private final VBox rowBox;
     private HBox selectedRow = null;
 
-    // ── 생성자 ─────────────────────────────────────────────
     public StockListPanel(double width, double height) {
         setPrefSize(width, height);
         setMaxSize(width, height);
@@ -53,31 +49,27 @@ public class StockListPanel extends VBox {
         setPadding(new Insets(20, 18, 18, 18));
         setSpacing(14);
 
-        // ── 헤더 ──
-        Label header = new Label("📈  주식 목록");
-        header.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 17));
+        Label header = new Label("📈 주식 목록");
+        header.setFont(Font.font("Moneygraphy Rounded", FontWeight.EXTRA_BOLD, 17));
         header.setTextFill(Color.web("#FFFFFF"));
 
-        // ── 컬럼 안내 ──
         Label nameCol = new Label("종목명");
-        nameCol.setFont(Font.font("System", FontWeight.BOLD, 12));
+        nameCol.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 12));
         nameCol.setTextFill(Color.web("#AAB4D4"));
 
         Region headSpacer = new Region();
         HBox.setHgrow(headSpacer, Priority.ALWAYS);
 
         Label priceCol = new Label("현재가");
-        priceCol.setFont(Font.font("System", FontWeight.BOLD, 12));
+        priceCol.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 12));
         priceCol.setTextFill(Color.web("#AAB4D4"));
 
         HBox colHeader = new HBox(8, nameCol, headSpacer, priceCol);
         colHeader.setAlignment(Pos.CENTER_LEFT);
         colHeader.setPadding(new Insets(0, 12, 0, 12));
 
-        // ── 종목 데이터 (정식 종목명 + 시작가) ──
         registerDefaultStocks();
 
-        // ── 목록 영역 ──
         rowBox = new VBox(6);
         for (Map.Entry<String, Long> e : stocks.entrySet()) {
             rowBox.getChildren().add(buildStockRow(e.getKey(), e.getValue()));
@@ -98,71 +90,83 @@ public class StockListPanel extends VBox {
         getChildren().addAll(header, colHeader, scroll);
     }
 
-    /** 거래 종목 12종 등록 — 이름은 정식 종목명으로 교정 */
     private void registerDefaultStocks() {
-        stocks.put("삼성전자",          75_000L);
-        stocks.put("SK하이닉스",        180_000L);
-        stocks.put("셀트리온",          175_000L);
-        stocks.put("유한양행",          120_000L);
-        stocks.put("한화에어로스페이스", 320_000L);   // 입력: 한화에어로슾페이스
-        stocks.put("LIG넥스원",         240_000L);   // 입력: LIG넥원
-        stocks.put("LG에너지솔루션",     380_000L);
-        stocks.put("에코프로비엠",       180_000L);
-        stocks.put("네이버",            210_000L);
-        stocks.put("카카오",            42_000L);
-        stocks.put("현대차",            250_000L);
-        stocks.put("기아",              105_000L);
+        stocks.put("삼성전자", 75_000L);
+        stocks.put("SK하이닉스", 180_000L);
+        stocks.put("셀트리온", 175_000L);
+        stocks.put("유한양행", 120_000L);
+        stocks.put("한화에어로스페이스", 320_000L);
+        stocks.put("LIG넥스원", 240_000L);
+        stocks.put("LG에너지솔루션", 380_000L);
+        stocks.put("에코프로비엠", 180_000L);
+        stocks.put("네이버", 210_000L);
+        stocks.put("카카오", 42_000L);
+        stocks.put("현대차", 250_000L);
+        stocks.put("기아", 105_000L);
     }
 
-    // ── 공개 API ────────────────────────────────────────────
-
-    /** 종목 행 클릭 시 호출될 리스너 등록 (예: OrderPanel::setSelectedStock) */
     public void setOnStockSelected(BiConsumer<String, Long> listener) {
         this.onStockSelected = listener;
     }
 
-    /** 특정 종목 현재가 반환 (없으면 0) */
     public long getPrice(String stockName) {
         return stocks.getOrDefault(stockName, 0L);
     }
 
-    /** 종목 현재가 갱신 + 화면 반영 */
     public void updatePrice(String stockName, long price) {
         if (!stocks.containsKey(stockName)) return;
+
         stocks.put(stockName, price);
+
         for (var node : rowBox.getChildren()) {
             if (node instanceof HBox row && stockName.equals(row.getUserData())) {
-                Label priceLabel = (Label) ((VBox) row.getChildren().get(2)).getChildren().get(0);
+                Circle trendDot = (Circle) row.getChildren().get(0);
+                Label priceLabel = (Label) ((VBox) row.getChildren().get(3)).getChildren().get(0);
+
+                Color trendColor = getTrendColor(stockName, price);
+                trendDot.setFill(trendColor);
+                trendDot.setEffect(new DropShadow(8, trendColor));
                 priceLabel.setText(formatMoney(price) + " 원");
+                break;
             }
         }
     }
 
-    // ── 내부 UI ─────────────────────────────────────────────
-
     private HBox buildStockRow(String name, long price) {
+        Color trendColor = getTrendColor(name, price);
+
+        Circle trendDot = new Circle(5);
+        trendDot.setFill(trendColor);
+        trendDot.setStroke(Color.web("#FFFFFF", 0.35));
+        trendDot.setStrokeWidth(1);
+        trendDot.setEffect(new DropShadow(8, trendColor));
+
         Label nameLabel = new Label(name);
-        nameLabel.setFont(Font.font("System", FontWeight.BOLD, 14));
+        nameLabel.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 14));
         nameLabel.setTextFill(Color.web("#E0E8FF"));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Label priceLabel = new Label(formatMoney(price) + " 원");
-        priceLabel.setFont(Font.font("System", FontWeight.BOLD, 14));
+        priceLabel.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 14));
         priceLabel.setTextFill(Color.web("#7EDDFF"));
 
         VBox rightBox = new VBox(priceLabel);
         rightBox.setAlignment(Pos.CENTER_RIGHT);
 
-        HBox row = new HBox(8, nameLabel, spacer, rightBox);
+        HBox row = new HBox(8, trendDot, nameLabel, spacer, rightBox);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(10, 12, 10, 12));
         row.setUserData(name);
         applyRowStyle(row, false);
 
-        row.setOnMouseEntered(e -> { if (row != selectedRow) applyRowStyle(row, true); });
-        row.setOnMouseExited(e  -> { if (row != selectedRow) applyRowStyle(row, false); });
+        row.setOnMouseEntered(e -> {
+            if (row != selectedRow) applyRowStyle(row, true);
+        });
+        row.setOnMouseExited(e -> {
+            if (row != selectedRow) applyRowStyle(row, false);
+        });
         row.setOnMouseClicked(e -> selectRow(row, name, price));
 
         return row;
@@ -176,6 +180,12 @@ public class StockListPanel extends VBox {
         if (onStockSelected != null) {
             onStockSelected.accept(name, price);
         }
+    }
+
+    private Color getTrendColor(String stockName, long price) {
+        return ChartPanel.isBullTrend(stockName, price)
+            ? Color.web("#ff6b6b")
+            : Color.web("#4A9EFF");
     }
 
     private void applyRowStyle(HBox row, boolean hover) {
@@ -195,6 +205,21 @@ public class StockListPanel extends VBox {
             "-fx-border-width: 1.2;" +
             "-fx-cursor: hand;"
         );
+    }
+
+    /**
+     * 목록의 첫 번째 종목을 자동 선택합니다.
+     * 앱 시작 시 ChartPanel과 초기 상태를 동기화하기 위해 Main.java에서 호출됩니다.
+     */
+    public void selectFirst() {
+        if (rowBox.getChildren().isEmpty()) return;
+        if (rowBox.getChildren().get(0) instanceof HBox row) {
+            String name = (String) row.getUserData();
+            Long price = stocks.get(name);
+            if (price != null) {
+                selectRow(row, name, price);
+            }
+        }
     }
 
     private static String formatMoney(long value) {
