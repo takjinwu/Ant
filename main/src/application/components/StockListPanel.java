@@ -116,6 +116,9 @@ public class StockListPanel extends VBox {
     public void updatePrice(String stockName, long price) {
         if (!stocks.containsKey(stockName)) return;
 
+        // 직전 가격과 비교해 상승/하락 방향을 결정 (차트 변동을 그대로 반영)
+        long prev = stocks.get(stockName);
+        boolean up = price >= prev;
         stocks.put(stockName, price);
 
         for (var node : rowBox.getChildren()) {
@@ -123,12 +126,34 @@ public class StockListPanel extends VBox {
                 Circle trendDot = (Circle) row.getChildren().get(0);
                 Label priceLabel = (Label) ((VBox) row.getChildren().get(3)).getChildren().get(0);
 
-                Color trendColor = getTrendColor(stockName, price);
+                Color trendColor = up ? Color.web("#ff6b6b") : Color.web("#4A9EFF");
                 trendDot.setFill(trendColor);
                 trendDot.setEffect(new DropShadow(8, trendColor));
                 priceLabel.setText(formatMoney(price) + " 원");
                 break;
             }
+        }
+    }
+
+    /**
+     * 턴이 넘어갈 때 호출 — 차트에 표시 중인 종목(excludeName)을 제외한
+     * 나머지 모든 종목의 시세를 뉴스 effect를 반영해 랜덤 워크로 갱신합니다.
+     * (차트에 표시 중인 종목은 ChartPanel.addCandle → updatePrice 로 별도 동기화됩니다.)
+     */
+    public void advanceMarket(int effect, String excludeName) {
+        java.util.Random r = new java.util.Random();
+        for (String name : stocks.keySet().toArray(new String[0])) {
+            if (name.equals(excludeName)) continue;
+
+            long cur = stocks.get(name);
+            // 뉴스 effect는 약한 편향만 주고, 종목별 랜덤 변동이 방향을 좌우하도록 함
+            // → 같은 턴이라도 종목마다 개별적으로 오르거나(빨강) 내림(파랑)
+            double bias  = effect * 0.0015;                      // effect 10 → +1.5% 편향
+            double drift = bias + (r.nextDouble() - 0.5) * 0.08; // 랜덤 노이즈 ±4%
+            long next = (long) ChartPanel.roundToTick(cur * (1 + drift));
+            if (next < 1) next = 1;
+
+            updatePrice(name, next);
         }
     }
 
