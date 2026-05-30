@@ -106,20 +106,32 @@ public class Main extends Application {
 
 	private void showStartNotice(NewsPanel newsPanel) {
 		Label notice = new Label("10초 후 시작됩니다");
+		Button skipButton = new Button("스킵");
 
 		notice.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 34));
 		notice.setTextFill(Color.WHITE);
 		notice.setStyle(
 			"-fx-background-color: rgba(0, 0, 0, 0.58);" +
 			"-fx-background-radius: 22;" +
-			"-fx-padding: 20 42 20 42;" +
-			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 20, 0.3, 0, 4);"
+			"-fx-padding: 20 42 20 42;"
 		);
 
-		StackPane.setAlignment(notice, Pos.TOP_CENTER);
-		StackPane.setMargin(notice, new Insets(30, 0, 0, 0));
+		skipButton.setStyle(
+			"-fx-background-color: rgba(255,255,255,0.22);" +
+			"-fx-text-fill: white;" +
+			"-fx-font-size: 18px;" +
+			"-fx-font-weight: bold;" +
+			"-fx-background-radius: 16;" +
+			"-fx-padding: 10 24 10 24;"
+		);
 
-		appRoot.getChildren().add(notice);
+		VBox noticeBox = new VBox(12, notice, skipButton);
+		noticeBox.setAlignment(Pos.CENTER);
+
+		StackPane.setAlignment(noticeBox, Pos.TOP_CENTER);
+		StackPane.setMargin(noticeBox, new Insets(30, 0, 0, 0));
+
+		appRoot.getChildren().add(noticeBox);
 
 		final int[] count = {10};
 
@@ -130,13 +142,20 @@ public class Main extends Application {
 				if (count[0] > 0) {
 					notice.setText(count[0] + "초 후 시작됩니다");
 				} else {
-					appRoot.getChildren().remove(notice);
+					appRoot.getChildren().remove(noticeBox);
 					newsPanel.startGame();
 				}
 			})
 		);
 
 		countdown.setCycleCount(10);
+
+		skipButton.setOnAction(e -> {
+			countdown.stop();
+			appRoot.getChildren().remove(noticeBox);
+			newsPanel.startGame();
+		});
+
 		countdown.play();
 	}
 
