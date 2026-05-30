@@ -280,12 +280,20 @@ public class Main extends Application {
 	}
 
 	private HBox buildCenter(NewsPanel newsPanel, ChartPanel chartPanel) {
-		VBox leftColumn = buildLeftColumn(chartPanel);
+		OrderPanel order = new OrderPanel(370, BOTTOM_H);
+		WalletPanel wallet = new WalletPanel(370, BOTTOM_H);
+		StockListPanel stockList = new StockListPanel(520, COLUMN_H);
+
+		// ── 패널 간 연동 ──
+		order.setWallet(wallet);                          // 주문 → 지갑(체결/잔액)
+		stockList.setOnStockSelected(order::setSelectedStock); // 종목 선택 → 주문 패널
+
+		VBox leftColumn = buildLeftColumn(chartPanel, order, wallet);
 
 		HBox center = new HBox(
 				18,
 				leftColumn,
-				new StockListPanel(520, COLUMN_H),
+				stockList,
 				newsPanel
 		);
 
@@ -294,10 +302,7 @@ public class Main extends Application {
 		return center;
 	}
 
-	private VBox buildLeftColumn(ChartPanel chart) {
-		OrderPanel order = new OrderPanel(370, BOTTOM_H);
-		WalletPanel wallet = new WalletPanel(370, BOTTOM_H);
-
+	private VBox buildLeftColumn(ChartPanel chart, OrderPanel order, WalletPanel wallet) {
 		HBox bottom = new HBox(GAP, order, wallet);
 		VBox left = new VBox(GAP, chart, bottom);
 
