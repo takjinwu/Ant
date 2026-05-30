@@ -291,6 +291,12 @@ public class Main extends Application {
 			chartPanel.showStock(name, price);
 		});
 
+		wallet.setOnHoldingSelected(name -> {            // 보유 주식 선택 → 매도모드
+			long price = stockList.getPrice(name);
+			order.setSelectedHolding(name, price);
+			chartPanel.showStock(name, price);
+		});
+
 		VBox leftColumn = buildLeftColumn(chartPanel, order, wallet);
 
 		HBox center = new HBox(

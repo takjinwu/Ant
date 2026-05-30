@@ -16,6 +16,7 @@ import java.text.NumberFormat;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * WalletPanel
@@ -36,6 +37,9 @@ public class WalletPanel extends VBox {
     // ── UI 요소 ────────────────────────────────────────────
     private final Label cashValueLabel;
     private final VBox  stockListBox;
+
+    // 보유 주식 클릭 콜백 (종목명 전달)
+    private Consumer<String> onHoldingSelected = null;
 
     // ── 생성자 ─────────────────────────────────────────────
     public WalletPanel(double width, double height) {
@@ -160,6 +164,11 @@ public class WalletPanel extends VBox {
         return true;
     }
 
+    /** 보유 주식 행 클릭 시 호출될 리스너 등록 */
+    public void setOnHoldingSelected(Consumer<String> listener) {
+        this.onHoldingSelected = listener;
+    }
+
     /** 특정 종목 보유 수량 반환 (없으면 0) */
     public int getQuantity(String stockName) {
         int[] info = holdings.get(stockName);
@@ -209,8 +218,29 @@ public class WalletPanel extends VBox {
         row.setPadding(new Insets(8, 12, 8, 12));
         row.setStyle(
             "-fx-background-color: rgba(255,255,255,0.06);" +
-            "-fx-background-radius: 12;"
+            "-fx-background-radius: 12;" +
+            "-fx-cursor: hand;"
         );
+
+        row.setOnMouseEntered(e -> row.setStyle(
+            "-fx-background-color: rgba(231,76,60,0.16);" +
+            "-fx-background-radius: 12;" +
+            "-fx-border-color: rgba(231,76,60,0.45);" +
+            "-fx-border-radius: 12;" +
+            "-fx-cursor: hand;"
+        ));
+
+        row.setOnMouseExited(e -> row.setStyle(
+            "-fx-background-color: rgba(255,255,255,0.06);" +
+            "-fx-background-radius: 12;" +
+            "-fx-cursor: hand;"
+        ));
+
+        row.setOnMouseClicked(e -> {
+            if (onHoldingSelected != null) {
+                onHoldingSelected.accept(name);
+            }
+        });
 
         return row;
     }

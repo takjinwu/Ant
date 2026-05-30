@@ -2,6 +2,7 @@ package application.components;
 
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
@@ -30,9 +31,13 @@ public class OrderPanel extends VBox {
     // ── 연동 지갑 ──────────────────────────────────────────
     private WalletPanel wallet = null;
 
+    // ── 주문 모드 ──────────────────────────────────────────
+    private boolean sellMode = false;
+
     // ── UI 요소 ────────────────────────────────────────────
     private final Label     selectedLabel;   // 선택 종목명
     private final Label     priceLabel;      // 현재가
+    private final Label     ratioHeader;     // 비율 매수 / 비율 매도
     private final TextField qtyField;        // 수량 입력
     private final Label     feedbackLabel;   // 결과 안내
 
@@ -75,7 +80,7 @@ public class OrderPanel extends VBox {
         );
 
         // ── 퀵 비율 버튼 (10% / 25% / 50% / 전부) ──
-        Label ratioHeader = new Label("비율 매수");
+        ratioHeader = new Label("비율 매수");
         ratioHeader.setFont(Font.font("System", FontWeight.BOLD, 12));
         ratioHeader.setTextFill(Color.web("#AAB4D4"));
 
@@ -158,7 +163,23 @@ public class OrderPanel extends VBox {
         this.selectedStock = stockName;
         this.currentPrice  = price;
 
+        setBuyMode();
         selectedLabel.setText(stockName);
+        priceLabel.setText("현재가: " + formatMoney(price) + " 원");
+        qtyField.setText("0");
+        clearFeedback();
+    }
+
+    /**
+     * WalletPanel에서 보유 주식 클릭 시 호출
+     * → 매도모드로 전환하고 비율 버튼을 보유 수량 기준으로 계산
+     */
+    public void setSelectedHolding(String stockName, long price) {
+        this.selectedStock = stockName;
+        this.currentPrice  = price;
+
+        setSellMode();
+        selectedLabel.setText(stockName + " (매도 선택)");
         priceLabel.setText("현재가: " + formatMoney(price) + " 원");
         qtyField.setText("0");
         clearFeedback();
@@ -174,14 +195,26 @@ public class OrderPanel extends VBox {
 
     // ── 내부 로직 ────────────────────────────────────────────
 
-    /** 비율 버튼 클릭 → 살 수 있는 최대 수량을 qtyField에 채움 */
+    /** 비율 버튼 클릭 → 매수모드: 현금 기준 / 매도모드: 보유 수량 기준 */
     private void applyRatio(double ratio) {
         if (wallet == null || currentPrice <= 0) {
             setFeedback("⚠ 종목 또는 지갑이 연결되지 않았습니다.", false);
             return;
         }
-        long budget    = (long) (wallet.getCash() * ratio);
-        int  maxQty    = (int) (budget / currentPrice);
+
+        int maxQty;
+        if (sellMode) {
+            int heldQty = wallet.getQuantity(selectedStock);
+            maxQty = (int) Math.floor(heldQty * ratio);
+
+            if (ratio > 0 && maxQty == 0 && heldQty > 0) {
+                maxQty = 1;
+            }
+        } else {
+            long budget = (long) (wallet.getCash() * ratio);
+            maxQty = (int) (budget / currentPrice);
+        }
+
         qtyField.setText(String.valueOf(maxQty));
         clearFeedback();
     }
@@ -221,6 +254,12 @@ public class OrderPanel extends VBox {
             boolean ok = wallet.sell(selectedStock, qty, currentPrice);
             if (ok) {
                 setFeedback("✅ " + selectedStock + " " + qty + "주 매도 완료!", true);
+                showInfoPopup("매도 완료", selectedStock + " " + qty + "주 매도가 완료되었습니다.");
+                setBuyMode();
+                selectedLabel.setText("종목을 선택하세요");
+                priceLabel.setText("현재가: ─");
+                selectedStock = null;
+                currentPrice = 0L;
             } else {
                 int held = wallet.getQuantity(selectedStock);
                 setFeedback("❌ 보유 수량 부족 (보유: " + held + "주)", false);
@@ -228,6 +267,24 @@ public class OrderPanel extends VBox {
         }
 
         qtyField.setText("0");
+    }
+
+    private void setBuyMode() {
+        sellMode = false;
+        ratioHeader.setText("비율 매수");
+    }
+
+    private void setSellMode() {
+        sellMode = true;
+        ratioHeader.setText("비율 매도");
+    }
+
+    private void showInfoPopup(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
 
     private void setFeedback(String msg, boolean success) {
