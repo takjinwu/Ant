@@ -19,7 +19,7 @@ public class NewsPanel extends Pane {
 
 	private static final String FONT = "Moneygraphy Rounded";
 
-	private final PanelCard card;
+	private final javafx.scene.layout.StackPane card;
 	private final Label timeLabel;
 	private final Label turnLabel;
 	private final Label titleLabel;
@@ -110,7 +110,10 @@ public class NewsPanel extends Pane {
 	public NewsPanel(double width, double height) {
 		setPrefSize(width, height);
 
-		card = new PanelCard("", 32, FontWeight.BOLD, width, height) {};
+		card = new javafx.scene.layout.StackPane();
+		card.getStyleClass().add("panel");
+		card.setPrefSize(width, height);
+		card.setMaxHeight(height);
 
 		timeLabel = new Label("00:00");
 		timeLabel.setFont(Font.font(FONT, FontWeight.BOLD, 18));

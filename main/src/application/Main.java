@@ -3,7 +3,6 @@ package application;
 import application.components.ChartPanel;
 import application.components.NewsPanel;
 import application.components.OrderPanel;
-import application.components.PanelCard;
 import application.components.StockListPanel;
 import application.components.WalletPanel;
 import javafx.animation.Interpolator;
@@ -76,6 +75,13 @@ public class Main extends Application {
 				System.out.println("턴: " + turn);
 
 				chartPanel.addCandle(effect);  // 턴마다 새 캔들 추가
+
+				// 현재 선택 종목의 가격·점 색상을 실제 차트 데이터와 동기화
+				String curName = chartPanel.getCurrentStockName();
+				if (curName != null && !curName.isEmpty() && stockListRef != null) {
+					long newPrice = chartPanel.getLastClosePrice();
+					stockListRef.updatePrice(curName, newPrice);
+				}
 			});
 
 			newsPanel.setImageClickHandler(imageView -> {
@@ -226,7 +232,11 @@ public class Main extends Application {
 	}
 
 	private HBox buildTop(Stage stage, NewsPanel newsPanel) {
-		PanelCard brand = new PanelCard("개미증권", 26, FontWeight.EXTRA_BOLD, 280, 56) {};
+		javafx.scene.image.Image logoImg = new javafx.scene.image.Image(
+				getClass().getResourceAsStream("images/logo.png"));
+		javafx.scene.image.ImageView brand = new javafx.scene.image.ImageView(logoImg);
+		brand.setPreserveRatio(true);
+		brand.setFitHeight(56);
 
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
@@ -296,6 +306,7 @@ public class Main extends Application {
 
 		// ── 패널 간 연동 ──
 		order.setWallet(wallet);                          // 주문 → 지갑(체결/잔액)
+		stockList.setChartPanel(chartPanel);              // 동그라미 색상이 실제 차트 데이터와 동기화
 		stockList.setOnStockSelected((name, price) -> {   // 종목 선택 → 주문 패널 + 차트
 			order.setSelectedStock(name, price);
 			chartPanel.showStock(name, price);

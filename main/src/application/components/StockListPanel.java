@@ -33,6 +33,9 @@ public class StockListPanel extends VBox {
     private final VBox rowBox;
     private HBox selectedRow = null;
 
+    // 실제 차트 데이터 기반 색상 판단을 위해 ChartPanel 참조 보관
+    private ChartPanel chartPanel = null;
+
     public StockListPanel(double width, double height) {
         setPrefSize(width, height);
         setMaxSize(width, height);
@@ -103,6 +106,11 @@ public class StockListPanel extends VBox {
         stocks.put("카카오", 42_000L);
         stocks.put("현대차", 250_000L);
         stocks.put("기아", 105_000L);
+    }
+
+    /** ChartPanel 참조를 설정합니다. 설정 후 동그라미 색상이 실제 차트 데이터와 동기화됩니다. */
+    public void setChartPanel(ChartPanel cp) {
+        this.chartPanel = cp;
     }
 
     public void setOnStockSelected(BiConsumer<String, Long> listener) {
@@ -183,9 +191,10 @@ public class StockListPanel extends VBox {
     }
 
     private Color getTrendColor(String stockName, long price) {
-        return ChartPanel.isBullTrend(stockName, price)
-            ? Color.web("#ff6b6b")
-            : Color.web("#4A9EFF");
+        boolean bull = (chartPanel != null)
+                ? chartPanel.isBullTrendFor(stockName, price)
+                : ChartPanel.isBullTrend(stockName, price);
+        return bull ? Color.web("#ff6b6b") : Color.web("#4A9EFF");
     }
 
     private void applyRowStyle(HBox row, boolean hover) {

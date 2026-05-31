@@ -61,6 +61,10 @@ public class ChartPanel extends VBox {
 
     private double[][] data = SAMPLE_SERIES;
 
+    // ── 종목별 데이터 캐시 (버그 수정: 탭 전환 시 addCandle 데이터 유지) ──
+    private final java.util.HashMap<String, double[][]> dataCache = new java.util.HashMap<>();
+    private String currentStockName = "";
+
     private final double panelW;
     private final double candleH;
     private final double volH;
@@ -268,12 +272,19 @@ public class ChartPanel extends VBox {
         newData[data.length] = new double[]{open, high, low, close, vol};
         data = newData;
 
+        // 캐시 동기화 — 다른 종목을 클릭했다 돌아와도 누적 캔들 유지
+        if (!currentStockName.isEmpty()) {
+            dataCache.put(currentStockName, data);
+        }
+
         updateHeaderPriceFromLatestCandle();
         redraw();
     }
 
     public void showStock(String name, long price) {
-        this.data = generateSeries(name, price);
+        this.currentStockName = name;
+        // 캐시에 없을 때만 새로 생성 — 기존 addCandle 데이터를 보존
+        this.data = dataCache.computeIfAbsent(name, k -> generateSeries(k, price));
 
         boolean darkText = "카카오".equals(name);
         badge.setText(name);
@@ -358,6 +369,25 @@ public class ChartPanel extends VBox {
     public static boolean isBullTrend(String name, long price) {
         double[][] series = generateSeries(name, price);
         double[] last = series[series.length - 1];
+        return last[3] >= last[0];
+    }
+
+    /** 현재 선택된 종목명 반환 */
+    public String getCurrentStockName() { return currentStockName; }
+
+    /** 현재 차트 마지막 캔들의 종가 반환 */
+    public long getLastClosePrice() {
+        if (data == null || data.length == 0) return 0L;
+        return (long) data[data.length - 1][3];
+    }
+
+    /**
+     * 캐시된 실제 데이터 기반으로 bull/bear 판단.
+     * addCandle 이후에도 최신 트렌드를 정확히 반영합니다.
+     */
+    public boolean isBullTrendFor(String name, long price) {
+        double[][] d = dataCache.computeIfAbsent(name, k -> generateSeries(k, price));
+        double[] last = d[d.length - 1];
         return last[3] >= last[0];
     }
 
