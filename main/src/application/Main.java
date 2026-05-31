@@ -16,7 +16,10 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.CheckBox;
+import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.Slider;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -25,14 +28,22 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.util.Duration;
+import javafx.scene.input.KeyCode;
+import javafx.scene.image.Image;
+
 
 public class Main extends Application {
+
+	private MediaPlayer bgmPlayer;
 
 	private static final double CHART_H = 620;
 	private static final double BOTTOM_H = 260;
@@ -41,26 +52,21 @@ public class Main extends Application {
 
 	private StackPane appRoot;
 	private Pane zoomLayer;
-	private StockListPanel stockListRef;   // ← 추가: start()에서 selectFirst() 호출용
-	
+	private StockListPanel stockListRef;
+
 	private String uiFontFamily = Font.getDefault().getFamily();
 
 	@Override
 	public void start(Stage primaryStage) {
 		try {
-			
-			// ── SUIT 폰트 로드 (Canvas 렌더링용) ──
 			java.io.InputStream regularStream = getClass().getResourceAsStream("fonts/SUIT-Regular.ttf");
-			java.io.InputStream boldStream    = getClass().getResourceAsStream("fonts/SUIT-Bold.ttf");
-			System.out.println("[폰트 진단] SUIT-Regular 스트림: " + (regularStream != null ? "OK" : "NULL ← 파일 없음!"));
-			System.out.println("[폰트 진단] SUIT-Bold    스트림: " + (boldStream    != null ? "OK" : "NULL ← 파일 없음!"));
-			Font regFont  = (regularStream != null) ? Font.loadFont(regularStream, 12) : null;
-			Font loadedFont = (boldStream  != null) ? Font.loadFont(boldStream,   34) : null;
-			System.out.println("[폰트 진단] Regular 로드 결과: " + (regFont     != null ? regFont.getFamily()     : "실패"));
-			System.out.println("[폰트 진단] Bold    로드 결과: " + (loadedFont  != null ? loadedFont.getFamily() : "실패"));
+			java.io.InputStream boldStream = getClass().getResourceAsStream("fonts/SUIT-Bold.ttf");
+
+			Font regFont = (regularStream != null) ? Font.loadFont(regularStream, 12) : null;
+			Font loadedFont = (boldStream != null) ? Font.loadFont(boldStream, 34) : null;
+
 			if (loadedFont != null) uiFontFamily = loadedFont.getFamily();
 			else uiFontFamily = "SUIT";
-			System.out.println("[폰트 진단] uiFontFamily = " + uiFontFamily);
 
 			BorderPane root = new BorderPane();
 			root.setPadding(new Insets(18));
@@ -72,6 +78,8 @@ public class Main extends Application {
 					"#9B005C 100%);"
 			);
 
+			playBgm();
+
 			NewsPanel newsPanel = new NewsPanel(560, COLUMN_H);
 			ChartPanel chartPanel = new ChartPanel(760, CHART_H);
 
@@ -82,12 +90,11 @@ public class Main extends Application {
 				System.out.println("영향: " + effect);
 				System.out.println("턴: " + turn);
 
-				// ── [핵심 수정] 모든 종목에 캔들 추가 → StockListPanel 가격 일괄 갱신 ──
 				if (stockListRef != null) {
 					chartPanel.addCandleToAll(stockListRef.getStocks(), effect);
 					stockListRef.updateAllPrices(chartPanel);
 				} else {
-					chartPanel.addCandle(effect);  // fallback (stockListRef 미설정 시)
+					chartPanel.addCandle(effect);
 				}
 			});
 
@@ -106,20 +113,47 @@ public class Main extends Application {
 			Scene scene = new Scene(appRoot, 1920, 1080);
 			scene.getStylesheets().add(getClass().getResource("application.css").toExternalForm());
 
-			primaryStage.initStyle(StageStyle.UNDECORATED);
 			primaryStage.setTitle("개미증권");
 			primaryStage.setScene(scene);
-			primaryStage.setMaximized(true);
-
+			primaryStage.setFullScreen(true);
+			primaryStage.setFullScreenExitHint("");
 			primaryStage.show();
 
-			// ── [핵심 수정] 화면이 뜬 직후 첫 번째 종목(삼성전자)을 자동 선택해
-			//    ChartPanel 초기 차트를 StockListPanel 추세 데이터와 일치시킴 ──
+			scene.setOnKeyPressed(e -> {
+			    if (e.isAltDown() && e.getCode() == KeyCode.ENTER) {
+			        toggleFullScreen(primaryStage);
+			    }
+			});
+
 			Platform.runLater(() -> {
 				if (stockListRef != null) stockListRef.selectFirst();
 			});
 
 			showStartNotice(newsPanel);
+
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	private void playBgm() {
+		try {
+			java.net.URL bgmUrl = getClass().getResource("/music/main_bgm.mp3");
+
+			if (bgmUrl == null) {
+				bgmUrl = getClass().getResource("music/main_bgm.mp3");
+			}
+
+			if (bgmUrl == null) {
+				System.out.println("BGM 파일을 찾을 수 없습니다.");
+				return;
+			}
+
+			Media bgm = new Media(bgmUrl.toExternalForm());
+			bgmPlayer = new MediaPlayer(bgm);
+			bgmPlayer.setCycleCount(MediaPlayer.INDEFINITE);
+			bgmPlayer.setVolume(0.3);
+			bgmPlayer.play();
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -182,9 +216,7 @@ public class Main extends Application {
 	}
 
 	private void showImageZoom(ImageView sourceImageView) {
-		if (sourceImageView.getImage() == null) {
-			return;
-		}
+		if (sourceImageView.getImage() == null) return;
 
 		Bounds sceneBounds = sourceImageView.localToScene(sourceImageView.getBoundsInLocal());
 
@@ -240,7 +272,9 @@ public class Main extends Application {
 
 	private HBox buildTop(Stage stage, NewsPanel newsPanel) {
 		javafx.scene.image.Image logoImg = new javafx.scene.image.Image(
-				getClass().getResourceAsStream("images/logo.png"));
+			getClass().getResourceAsStream("images/logo.png")
+		);
+
 		javafx.scene.image.ImageView brand = new javafx.scene.image.ImageView(logoImg);
 		brand.setPreserveRatio(true);
 		brand.setFitHeight(56);
@@ -249,18 +283,32 @@ public class Main extends Application {
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 
 		Button fastForward = new Button("▶▶");
-		fastForward.setStyle(
-			"-fx-background-color: rgba(255,255,255,0.18);" +
-			"-fx-text-fill: white;" +
-			"-fx-font-size: 18px;" +
-			"-fx-font-weight: bold;" +
-			"-fx-background-radius: 18;" +
-			"-fx-padding: 10 22 10 22;" +
-			"-fx-border-color: rgba(255,255,255,0.35);" +
-			"-fx-border-radius: 18;"
-		);
+		fastForward.setStyle(topButtonStyle());
 		fastForward.setOnAction(e -> newsPanel.nextTurn());
 
+		Image gearImg = new Image(
+			    getClass().getResourceAsStream("images/gear.png")
+			);
+
+			ImageView gearView = new ImageView(gearImg);
+
+			gearView.setFitWidth(28);
+			gearView.setFitHeight(28);
+			
+			Button optionButton = new Button();
+
+			optionButton.setGraphic(gearView);
+
+			optionButton.setStyle(
+			    "-fx-background-color: rgba(255,255,255,0.15);" +
+			    "-fx-background-radius: 50;" +
+			    "-fx-min-width: 50;" +
+			    "-fx-min-height: 50;" +
+			    "-fx-max-width: 50;" +
+			    "-fx-max-height: 50;" +
+			    "-fx-cursor: hand;"
+			);
+		optionButton.setOnAction(e -> showOptionWindow(stage));
 		Button exitButton = new Button("종료");
 		exitButton.setStyle(
 			"-fx-background-color: linear-gradient(to right, #ff416c, #ff4b2b);" +
@@ -272,54 +320,158 @@ public class Main extends Application {
 			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 12, 0.3, 0, 3);"
 		);
 
-		exitButton.setOnMouseEntered(e -> {
-			exitButton.setStyle(
-				"-fx-background-color: linear-gradient(to right, #ff6a88, #ff7043);" +
-				"-fx-text-fill: white;" +
-				"-fx-font-size: 18px;" +
-				"-fx-font-weight: bold;" +
-				"-fx-background-radius: 18;" +
-				"-fx-padding: 10 26 10 26;" +
-				"-fx-effect: dropshadow(gaussian, rgba(255,75,43,0.55), 18, 0.45, 0, 4);"
-			);
-		});
-
-		exitButton.setOnMouseExited(e -> {
-			exitButton.setStyle(
-				"-fx-background-color: linear-gradient(to right, #ff416c, #ff4b2b);" +
-				"-fx-text-fill: white;" +
-				"-fx-font-size: 18px;" +
-				"-fx-font-weight: bold;" +
-				"-fx-background-radius: 18;" +
-				"-fx-padding: 10 26 10 26;" +
-				"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 12, 0.3, 0, 3);"
-			);
-		});
-
 		exitButton.setOnAction(e -> stage.close());
 
-		HBox top = new HBox(12, brand, spacer, fastForward, exitButton);
+		HBox top = new HBox(12, brand, spacer, optionButton,fastForward,exitButton);
 		top.setPadding(new Insets(0, 0, 14, 0));
 		top.setAlignment(Pos.CENTER_LEFT);
 
 		return top;
 	}
 
+	private String topButtonStyle() {
+		return "-fx-background-color: rgba(255,255,255,0.18);" +
+			"-fx-text-fill: white;" +
+			"-fx-font-size: 18px;" +
+			"-fx-font-weight: bold;" +
+			"-fx-background-radius: 18;" +
+			"-fx-padding: 10 22 10 22;" +
+			"-fx-border-color: rgba(255,255,255,0.35);" +
+			"-fx-border-radius: 18;";
+	}
+
+	private void showOptionWindow(Stage stage) {
+		final double[] xOffset = {0};
+		final double[] yOffset = {0};
+	    Stage optionStage = new Stage();
+	    optionStage.initOwner(stage);
+	    optionStage.initModality(Modality.APPLICATION_MODAL);
+	    optionStage.initStyle(StageStyle.TRANSPARENT);
+
+	    Label title = new Label("설정");
+	    title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 30));
+	    title.setTextFill(Color.WHITE);
+
+	    Label volumeLabel = new Label("배경음악 볼륨");
+	    volumeLabel.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 16));
+	    volumeLabel.setTextFill(Color.WHITE);
+
+	    Slider volumeSlider = new Slider(0, 100, bgmPlayer != null ? bgmPlayer.getVolume() * 100 : 30);
+	    volumeSlider.setPrefWidth(280);
+	    volumeSlider.setShowTickLabels(true);
+	    volumeSlider.setShowTickMarks(true);
+
+	    volumeSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
+	        if (bgmPlayer != null) {
+	            bgmPlayer.setVolume(newVal.doubleValue() / 100.0);
+	        }
+	    });
+
+	    CheckBox fullscreenCheck = new CheckBox("전체화면");
+	    fullscreenCheck.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 16));
+	    fullscreenCheck.setTextFill(Color.WHITE);
+	    fullscreenCheck.setSelected(stage.isFullScreen());
+
+	    Button applyButton = new Button("적용");
+	    Button closeButton = new Button("닫기");
+
+	    String optionBtnStyle =
+	        "-fx-background-color: rgba(255,255,255,0.20);" +
+	        "-fx-text-fill: white;" +
+	        "-fx-font-size: 16px;" +
+	        "-fx-font-weight: bold;" +
+	        "-fx-background-radius: 16;" +
+	        "-fx-padding: 10 30 10 30;" +
+	        "-fx-border-color: rgba(255,255,255,0.35);" +
+	        "-fx-border-radius: 16;";
+
+	    applyButton.setStyle(optionBtnStyle);
+	    closeButton.setStyle(optionBtnStyle);
+
+	    applyButton.setOnAction(e -> {
+	        optionStage.close();
+
+	        Platform.runLater(() -> {
+	            if (fullscreenCheck.isSelected()) {
+	                stage.setFullScreen(true);
+	            } else {
+	                stage.setFullScreen(false);
+	                stage.setMaximized(false);
+	                stage.setWidth(1920);
+	                stage.setHeight(1080);
+	                stage.centerOnScreen();
+	            }
+	        });
+	    });
+
+	    closeButton.setOnAction(e -> optionStage.close());
+
+	    HBox buttons = new HBox(12, applyButton, closeButton);
+	    buttons.setAlignment(Pos.CENTER);
+
+	    VBox card = new VBox(
+	    	   22,
+	    	   title,
+	    	   volumeLabel,
+	    	   volumeSlider,
+	    	   fullscreenCheck,
+	    	   buttons
+	    );
+	    card.setAlignment(Pos.CENTER);
+	    card.setPadding(new Insets(34));
+
+	    card.setStyle(
+	        "-fx-background-color: linear-gradient(to bottom right, " +
+	            "rgba(6,18,74,0.78), " +
+	            "rgba(91,0,110,0.72), " +
+	            "rgba(155,0,92,0.68));" +
+	        "-fx-background-radius: 30;" +
+	        "-fx-border-color: rgba(255,255,255,0.32);" +
+	        "-fx-border-radius: 30;" +
+	        "-fx-border-width: 1.5;" 
+	    );
+	    card.setOnMousePressed(e -> {
+	        xOffset[0] = e.getSceneX();
+	        yOffset[0] = e.getSceneY();
+	    });
+
+	    card.setOnMouseDragged(e -> {
+	        optionStage.setX(e.getScreenX() - xOffset[0]);
+	        optionStage.setY(e.getScreenY() - yOffset[0]);
+	    });
+	    Scene scene = new Scene(card, 420, 330);
+	    scene.setFill(Color.TRANSPARENT);
+
+	    optionStage.setScene(scene);
+	    optionStage.show();
+	}
+	private void toggleFullScreen(Stage stage) {
+	    if (stage.isFullScreen()) {
+	        stage.setFullScreen(false);
+	        stage.setMaximized(false);
+	        stage.setWidth(1920);
+	        stage.setHeight(1080);
+	        stage.centerOnScreen();
+	    } else {
+	        stage.setFullScreen(true);
+	    }
+	}
+
 	private HBox buildCenter(NewsPanel newsPanel, ChartPanel chartPanel) {
 		OrderPanel order = new OrderPanel(370, BOTTOM_H);
 		WalletPanel wallet = new WalletPanel(370, BOTTOM_H);
 		StockListPanel stockList = new StockListPanel(520, COLUMN_H);
-		stockListRef = stockList;   // ← 추가: start()에서 접근하기 위해 저장
+		stockListRef = stockList;
 
-		// ── 패널 간 연동 ──
-		order.setWallet(wallet);                          // 주문 → 지갑(체결/잔액)
-		stockList.setChartPanel(chartPanel);              // 동그라미 색상이 실제 차트 데이터와 동기화
-		stockList.setOnStockSelected((name, price) -> {   // 종목 선택 → 주문 패널 + 차트
+		order.setWallet(wallet);
+		stockList.setChartPanel(chartPanel);
+
+		stockList.setOnStockSelected((name, price) -> {
 			order.setSelectedStock(name, price);
 			chartPanel.showStock(name, price);
 		});
 
-		wallet.setOnHoldingSelected(name -> {            // 보유 주식 선택 → 매도모드
+		wallet.setOnHoldingSelected(name -> {
 			long price = stockList.getPrice(name);
 			order.setSelectedHolding(name, price);
 			chartPanel.showStock(name, price);
@@ -328,10 +480,10 @@ public class Main extends Application {
 		VBox leftColumn = buildLeftColumn(chartPanel, order, wallet);
 
 		HBox center = new HBox(
-				18,
-				leftColumn,
-				stockList,
-				newsPanel
+			18,
+			leftColumn,
+			stockList,
+			newsPanel
 		);
 
 		center.setAlignment(Pos.TOP_LEFT);
@@ -342,7 +494,6 @@ public class Main extends Application {
 	private VBox buildLeftColumn(ChartPanel chart, OrderPanel order, WalletPanel wallet) {
 		HBox bottom = new HBox(GAP, order, wallet);
 		VBox left = new VBox(GAP, chart, bottom);
-
 		left.setPrefHeight(COLUMN_H);
 
 		return left;

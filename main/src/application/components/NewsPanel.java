@@ -84,10 +84,10 @@ public class NewsPanel extends Pane {
 	};
 
 	private final int[] crisisEffects = {
-			-9,
-			-8,
-			-10,
-			-7
+			-90,
+			-70,
+			-40,
+			-23
 	};
 
 	// 나중에 사진 넣을 때 여기 경로만 바꾸면 됨
