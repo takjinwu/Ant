@@ -29,6 +29,7 @@ import java.util.function.BiConsumer;
 public class StockListPanel extends VBox {
 
     private final Map<String, Long> stocks = new LinkedHashMap<>();
+    private final Map<String, Long> prevPrices = new LinkedHashMap<>();  // 이전 가격 (등락률 계산용)
     private BiConsumer<String, Long> onStockSelected = null;
 
     private final VBox rowBox;
@@ -147,15 +148,45 @@ public class StockListPanel extends VBox {
 
         stocks.put(stockName, price);
 
+        // ── 등락률: ChartPanel 캔들 데이터 기준 (차트 헤더와 동일한 계산식) ──
+        double changePct;
+        if (chartPanel != null) {
+            changePct = chartPanel.getChangePercentFor(stockName, price);
+        } else {
+            long oldPrice = prevPrices.getOrDefault(stockName, price);
+            changePct = (oldPrice != 0) ? (price - oldPrice) / (double) oldPrice * 100.0 : 0.0;
+        }
+        prevPrices.put(stockName, price);
+
+        boolean bull = changePct >= 0;
+        String sign = bull ? "+" : "";
+        String colorHex = bull ? "#ff6b6b" : "#4A9EFF";
+        String bgColor  = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
+
         for (var node : rowBox.getChildren()) {
             if (node instanceof HBox row && stockName.equals(row.getUserData())) {
                 Circle trendDot = (Circle) row.getChildren().get(0);
-                Label priceLabel = (Label) ((VBox) row.getChildren().get(3)).getChildren().get(0);
+                VBox rightBox = (VBox) row.getChildren().get(3);
+                Label priceLabel = (Label) rightBox.getChildren().get(0);
+                Label changeLabel = (Label) rightBox.getChildren().get(1);
 
-                Color trendColor = getTrendColor(stockName, price);
+                Color trendColor = Color.web(colorHex);
                 trendDot.setFill(trendColor);
                 trendDot.setEffect(new DropShadow(8, trendColor));
+
                 priceLabel.setText(formatMoney(price) + " 원");
+                priceLabel.setTextFill(Color.web(colorHex));
+
+                changeLabel.setText(String.format("%s%.2f%%", sign, changePct));
+                changeLabel.setStyle(
+                    "-fx-text-fill: " + colorHex + ";" +
+                    "-fx-font-family: 'SUIT';" +
+                    "-fx-font-weight: bold;" +
+                    "-fx-font-size: 11px;" +
+                    "-fx-padding: 2 6 2 6;" +
+                    "-fx-background-color: " + bgColor + ";" +
+                    "-fx-background-radius: 5;"
+                );
                 break;
             }
         }
@@ -177,11 +208,26 @@ public class StockListPanel extends VBox {
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
+        boolean bull = getTrendBool(name, price);
+        String colorHex = bull ? "#ff6b6b" : "#4A9EFF";
+        String bgColor  = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
+
         Label priceLabel = new Label(formatMoney(price) + " 원");
         priceLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 14));
-        priceLabel.setTextFill(Color.web("#7EDDFF"));
+        priceLabel.setTextFill(Color.web(colorHex));
 
-        VBox rightBox = new VBox(priceLabel);
+        Label changeLabel = new Label("+0.00%");
+        changeLabel.setStyle(
+            "-fx-text-fill: " + colorHex + ";" +
+            "-fx-font-family: 'SUIT';" +
+            "-fx-font-weight: bold;" +
+            "-fx-font-size: 11px;" +
+            "-fx-padding: 2 6 2 6;" +
+            "-fx-background-color: " + bgColor + ";" +
+            "-fx-background-radius: 5;"
+        );
+
+        VBox rightBox = new VBox(2, priceLabel, changeLabel);
         rightBox.setAlignment(Pos.CENTER_RIGHT);
 
         HBox row = new HBox(8, trendDot, nameLabel, spacer, rightBox);
@@ -212,10 +258,17 @@ public class StockListPanel extends VBox {
     }
 
     private Color getTrendColor(String stockName, long price) {
-        boolean bull = (chartPanel != null)
+        return getTrendBool(stockName, price) ? Color.web("#ff6b6b") : Color.web("#4A9EFF");
+    }
+
+    private boolean getTrendBull(String stockName, long price) {
+        return getTrendBool(stockName, price);
+    }
+
+    private boolean getTrendBool(String stockName, long price) {
+        return (chartPanel != null)
                 ? chartPanel.isBullTrendFor(stockName, price)
                 : ChartPanel.isBullTrend(stockName, price);
-        return bull ? Color.web("#ff6b6b") : Color.web("#4A9EFF");
     }
 
     private void applyRowStyle(HBox row, boolean hover) {

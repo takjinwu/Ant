@@ -74,6 +74,7 @@ public class ChartPanel extends VBox {
     private Label badge;
     private Label nameLabel;
     private Label priceLabel;
+    private Label changeLabel;   // 등락률 표시 레이블
     private Label tooltipBox;
     private boolean showCandle = true;
     private double mouseX = -1, mouseY = -1;
@@ -135,7 +136,21 @@ public class ChartPanel extends VBox {
             "-fx-font-size: 24px;"
         );
 
-        VBox namePrice = new VBox(2, nameLabel, priceLabel);
+        changeLabel = new Label("+0.00%");
+        changeLabel.setStyle(
+            "-fx-text-fill: #ff6b6b;" +
+            "-fx-font-family: 'SUIT';" +
+            "-fx-font-weight: bold;" +
+            "-fx-font-size: 15px;" +
+            "-fx-padding: 4 8 4 8;" +
+            "-fx-background-color: rgba(232,83,74,0.15);" +
+            "-fx-background-radius: 6;"
+        );
+
+        HBox priceRow = new HBox(10, priceLabel, changeLabel);
+        priceRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox namePrice = new VBox(2, nameLabel, priceRow);
         namePrice.setAlignment(Pos.CENTER_LEFT);
 
         Region spacer = new Region();
@@ -340,6 +355,19 @@ public class ChartPanel extends VBox {
         return (long) d[d.length - 1][3];
     }
 
+    /**
+     * 특정 종목의 최신 등락률(%)을 반환합니다.
+     * 전 캔들 종가 대비 현재 캔들 종가 변화율.
+     */
+    public double getChangePercentFor(String name, long price) {
+        double[][] d = dataCache.computeIfAbsent(name, k -> generateSeries(k, price));
+        if (d == null || d.length == 0) return 0.0;
+        double[] last = d[d.length - 1];
+        double prevClose = (d.length >= 2) ? d[d.length - 2][3] : last[0];
+        if (prevClose == 0) return 0.0;
+        return (last[3] - prevClose) / prevClose * 100.0;
+    }
+
     public void showStock(String name, long price) {
         this.currentStockName = name;
         // 캐시에 없을 때만 새로 생성 — 기존 addCandle 데이터를 보존
@@ -456,12 +484,30 @@ public class ChartPanel extends VBox {
         double[] last = data[data.length - 1];
         boolean bull = last[3] >= last[0];
 
+        // 등락률: 전 캔들 종가 대비 변화율 (첫 캔들이면 open→close)
+        double prevClose = (data.length >= 2) ? data[data.length - 2][3] : last[0];
+        double changePct = (prevClose != 0) ? (last[3] - prevClose) / prevClose * 100.0 : 0.0;
+        String sign = changePct >= 0 ? "+" : "";
+        String colorHex = bull ? "#ff6b6b" : "#4A9EFF";
+        String bgColor  = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
+
         priceLabel.setText(String.format("%,.0f원", last[3]));
         priceLabel.setStyle(
-            "-fx-text-fill: " + (bull ? "#ff6b6b" : "#4A9EFF") + ";" +
+            "-fx-text-fill: " + colorHex + ";" +
             "-fx-font-family: 'SUIT';" +
             "-fx-font-weight: bold;" +
             "-fx-font-size: 24px;"
+        );
+
+        changeLabel.setText(String.format("%s%.2f%%", sign, changePct));
+        changeLabel.setStyle(
+            "-fx-text-fill: " + colorHex + ";" +
+            "-fx-font-family: 'SUIT';" +
+            "-fx-font-weight: bold;" +
+            "-fx-font-size: 15px;" +
+            "-fx-padding: 4 8 4 8;" +
+            "-fx-background-color: " + bgColor + ";" +
+            "-fx-background-radius: 6;"
         );
     }
 
@@ -668,12 +714,28 @@ public class ChartPanel extends VBox {
         StackPane.setMargin(tooltipBox, new Insets(ty, 0, 0, tx));
 
         boolean bull = d[3] >= d[0];
+        double changePct = (d[0] != 0) ? (d[3] - d[0]) / d[0] * 100.0 : 0.0;
+        String sign = changePct >= 0 ? "+" : "";
+        String colorHex = bull ? "#ff6b6b" : "#4A9EFF";
+        String bgColor  = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
+
         priceLabel.setText(String.format("%,.0f원", d[3]));
         priceLabel.setStyle(
-            "-fx-text-fill: " + (bull ? "#ff6b6b" : "#4A9EFF") + ";" +
+            "-fx-text-fill: " + colorHex + ";" +
             "-fx-font-family: 'SUIT';" +
             "-fx-font-weight: bold;" +
             "-fx-font-size: 24px;"
+        );
+
+        changeLabel.setText(String.format("%s%.2f%%", sign, changePct));
+        changeLabel.setStyle(
+            "-fx-text-fill: " + colorHex + ";" +
+            "-fx-font-family: 'SUIT';" +
+            "-fx-font-weight: bold;" +
+            "-fx-font-size: 15px;" +
+            "-fx-padding: 4 8 4 8;" +
+            "-fx-background-color: " + bgColor + ";" +
+            "-fx-background-radius: 6;"
         );
     }
 }
