@@ -39,7 +39,7 @@ import javafx.util.Duration;
 import javafx.scene.input.KeyCode;
 import javafx.scene.image.Image;
 import javafx.stage.Screen;
-
+import javafx.geometry.Rectangle2D;
 
 public class Main extends Application {
 
@@ -476,6 +476,10 @@ public class Main extends Application {
 
 	private void applyDisplayMode(DisplayMode mode) {
 		Stage oldStage = currentStage;
+
+		Screen targetScreen = getCurrentScreen(oldStage);
+		Rectangle2D bounds = targetScreen.getBounds();
+
 		Stage newStage = new Stage();
 
 		if (mode == DisplayMode.BORDERLESS) {
@@ -497,12 +501,12 @@ public class Main extends Application {
 		currentMode = mode;
 
 		if (mode == DisplayMode.FULLSCREEN) {
+			newStage.setX(bounds.getMinX());
+			newStage.setY(bounds.getMinY());
 			newStage.show();
 			newStage.setFullScreen(true);
 		}
 		else if (mode == DisplayMode.BORDERLESS) {
-			javafx.geometry.Rectangle2D bounds = Screen.getPrimary().getBounds();
-
 			newStage.setX(bounds.getMinX());
 			newStage.setY(bounds.getMinY());
 			newStage.setWidth(bounds.getWidth());
@@ -512,11 +516,37 @@ public class Main extends Application {
 		else if (mode == DisplayMode.WINDOWED) {
 			newStage.setWidth(1920);
 			newStage.setHeight(1080);
-			newStage.centerOnScreen();
+
+			double x = bounds.getMinX() + (bounds.getWidth() - 1920) / 2;
+			double y = bounds.getMinY() + (bounds.getHeight() - 1080) / 2;
+
+			newStage.setX(x);
+			newStage.setY(y);
+
 			newStage.show();
 		}
 	}
+	private Screen getCurrentScreen(Stage stage) {
+		if (stage == null) {
+			return Screen.getPrimary();
+		}
 
+		double centerX = stage.getX() + stage.getWidth() / 2;
+		double centerY = stage.getY() + stage.getHeight() / 2;
+
+		for (Screen screen : Screen.getScreens()) {
+			Rectangle2D bounds = screen.getBounds();
+
+			if (centerX >= bounds.getMinX() &&
+				centerX <= bounds.getMaxX() &&
+				centerY >= bounds.getMinY() &&
+				centerY <= bounds.getMaxY()) {
+				return screen;
+			}
+		}
+
+		return Screen.getPrimary();
+	}
 	private HBox buildCenter(NewsPanel newsPanel, ChartPanel chartPanel) {
 		OrderPanel order = new OrderPanel(370, BOTTOM_H);
 		WalletPanel wallet = new WalletPanel(370, BOTTOM_H);
