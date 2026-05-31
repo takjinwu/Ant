@@ -16,7 +16,6 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
-import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
@@ -39,6 +38,7 @@ import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import javafx.scene.input.KeyCode;
 import javafx.scene.image.Image;
+import javafx.stage.Screen;
 
 
 public class Main extends Application {
@@ -55,6 +55,17 @@ public class Main extends Application {
 	private StockListPanel stockListRef;
 
 	private String uiFontFamily = Font.getDefault().getFamily();
+
+	private Stage currentStage;
+	private Scene mainScene;
+
+	private enum DisplayMode {
+		FULLSCREEN,
+		BORDERLESS,
+		WINDOWED
+	}
+
+	private DisplayMode currentMode = DisplayMode.BORDERLESS;
 
 	@Override
 	public void start(Stage primaryStage) {
@@ -102,7 +113,8 @@ public class Main extends Application {
 				showImageZoom(imageView);
 			});
 
-			root.setTop(buildTop(primaryStage, newsPanel));
+			currentStage = primaryStage;
+			root.setTop(buildTop(newsPanel));
 			root.setCenter(buildCenter(newsPanel, chartPanel));
 
 			zoomLayer = new Pane();
@@ -110,20 +122,16 @@ public class Main extends Application {
 
 			appRoot = new StackPane(root, zoomLayer);
 
-			Scene scene = new Scene(appRoot, 1920, 1080);
-			scene.getStylesheets().add(getClass().getResource("application.css").toExternalForm());
+			mainScene = new Scene(appRoot, 1920, 1080);
+			mainScene.getStylesheets().add(getClass().getResource("application.css").toExternalForm());
 
-			primaryStage.setTitle("개미증권");
-			primaryStage.setScene(scene);
-			primaryStage.setFullScreen(true);
-			primaryStage.setFullScreenExitHint("");
-			primaryStage.show();
-
-			scene.setOnKeyPressed(e -> {
-			    if (e.isAltDown() && e.getCode() == KeyCode.ENTER) {
-			        toggleFullScreen(primaryStage);
-			    }
+			mainScene.setOnKeyPressed(e -> {
+				if (e.isAltDown() && e.getCode() == KeyCode.ENTER) {
+					toggleDisplayMode();
+				}
 			});
+
+			applyDisplayMode(DisplayMode.BORDERLESS);
 
 			Platform.runLater(() -> {
 				if (stockListRef != null) stockListRef.selectFirst();
@@ -270,7 +278,7 @@ public class Main extends Application {
 		});
 	}
 
-	private HBox buildTop(Stage stage, NewsPanel newsPanel) {
+	private HBox buildTop(NewsPanel newsPanel) {
 		javafx.scene.image.Image logoImg = new javafx.scene.image.Image(
 			getClass().getResourceAsStream("images/logo.png")
 		);
@@ -308,7 +316,7 @@ public class Main extends Application {
 			    "-fx-max-height: 50;" +
 			    "-fx-cursor: hand;"
 			);
-		optionButton.setOnAction(e -> showOptionWindow(stage));
+		optionButton.setOnAction(e -> showOptionWindow());
 		Button exitButton = new Button("종료");
 		exitButton.setStyle(
 			"-fx-background-color: linear-gradient(to right, #ff416c, #ff4b2b);" +
@@ -320,7 +328,7 @@ public class Main extends Application {
 			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 12, 0.3, 0, 3);"
 		);
 
-		exitButton.setOnAction(e -> stage.close());
+		exitButton.setOnAction(e -> currentStage.close());
 
 		HBox top = new HBox(12, brand, spacer, optionButton,fastForward,exitButton);
 		top.setPadding(new Insets(0, 0, 14, 0));
@@ -340,7 +348,8 @@ public class Main extends Application {
 			"-fx-border-radius: 18;";
 	}
 
-	private void showOptionWindow(Stage stage) {
+	private void showOptionWindow() {
+		Stage stage = currentStage;
 		final double[] xOffset = {0};
 		final double[] yOffset = {0};
 	    Stage optionStage = new Stage();
@@ -367,10 +376,21 @@ public class Main extends Application {
 	        }
 	    });
 
-	    CheckBox fullscreenCheck = new CheckBox("전체화면");
-	    fullscreenCheck.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 16));
-	    fullscreenCheck.setTextFill(Color.WHITE);
-	    fullscreenCheck.setSelected(stage.isFullScreen());
+	    Label screenModeLabel = new Label("화면 모드");
+	    screenModeLabel.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 16));
+	    screenModeLabel.setTextFill(Color.WHITE);
+
+	    ComboBox<String> screenModeBox = new ComboBox<>();
+	    screenModeBox.getItems().addAll("전체화면", "테두리 없음", "창모드");
+	    screenModeBox.setPrefWidth(280);
+
+	    if (currentMode == DisplayMode.FULLSCREEN) {
+	        screenModeBox.setValue("전체화면");
+	    } else if (currentMode == DisplayMode.BORDERLESS) {
+	        screenModeBox.setValue("테두리 없음");
+	    } else {
+	        screenModeBox.setValue("창모드");
+	    }
 
 	    Button applyButton = new Button("적용");
 	    Button closeButton = new Button("닫기");
@@ -391,17 +411,17 @@ public class Main extends Application {
 	    applyButton.setOnAction(e -> {
 	        optionStage.close();
 
-	        Platform.runLater(() -> {
-	            if (fullscreenCheck.isSelected()) {
-	                stage.setFullScreen(true);
-	            } else {
-	                stage.setFullScreen(false);
-	                stage.setMaximized(false);
-	                stage.setWidth(1920);
-	                stage.setHeight(1080);
-	                stage.centerOnScreen();
-	            }
-	        });
+	        String mode = screenModeBox.getValue();
+
+	        if (mode.equals("전체화면")) {
+	        	applyDisplayMode(DisplayMode.FULLSCREEN);
+	        }
+	        else if (mode.equals("테두리 없음")) {
+	        	applyDisplayMode(DisplayMode.BORDERLESS);
+	        }
+	        else if (mode.equals("창모드")) {
+	        	applyDisplayMode(DisplayMode.WINDOWED);
+	        }
 	    });
 
 	    closeButton.setOnAction(e -> optionStage.close());
@@ -414,7 +434,8 @@ public class Main extends Application {
 	    	   title,
 	    	   volumeLabel,
 	    	   volumeSlider,
-	    	   fullscreenCheck,
+	    	   screenModeLabel,
+	    	   screenModeBox,
 	    	   buttons
 	    );
 	    card.setAlignment(Pos.CENTER);
@@ -445,16 +466,55 @@ public class Main extends Application {
 	    optionStage.setScene(scene);
 	    optionStage.show();
 	}
-	private void toggleFullScreen(Stage stage) {
-	    if (stage.isFullScreen()) {
-	        stage.setFullScreen(false);
-	        stage.setMaximized(false);
-	        stage.setWidth(1920);
-	        stage.setHeight(1080);
-	        stage.centerOnScreen();
-	    } else {
-	        stage.setFullScreen(true);
-	    }
+	private void toggleDisplayMode() {
+		if (currentMode == DisplayMode.WINDOWED) {
+			applyDisplayMode(DisplayMode.BORDERLESS);
+		} else {
+			applyDisplayMode(DisplayMode.WINDOWED);
+		}
+	}
+
+	private void applyDisplayMode(DisplayMode mode) {
+		Stage oldStage = currentStage;
+		Stage newStage = new Stage();
+
+		if (mode == DisplayMode.BORDERLESS) {
+			newStage.initStyle(StageStyle.UNDECORATED);
+		} else {
+			newStage.initStyle(StageStyle.DECORATED);
+		}
+
+		newStage.setTitle("개미증권");
+		newStage.setFullScreenExitHint("");
+
+		if (oldStage != null) {
+			oldStage.setScene(null);
+			oldStage.close();
+		}
+
+		newStage.setScene(mainScene);
+		currentStage = newStage;
+		currentMode = mode;
+
+		if (mode == DisplayMode.FULLSCREEN) {
+			newStage.show();
+			newStage.setFullScreen(true);
+		}
+		else if (mode == DisplayMode.BORDERLESS) {
+			javafx.geometry.Rectangle2D bounds = Screen.getPrimary().getBounds();
+
+			newStage.setX(bounds.getMinX());
+			newStage.setY(bounds.getMinY());
+			newStage.setWidth(bounds.getWidth());
+			newStage.setHeight(bounds.getHeight());
+			newStage.show();
+		}
+		else if (mode == DisplayMode.WINDOWED) {
+			newStage.setWidth(1920);
+			newStage.setHeight(1080);
+			newStage.centerOnScreen();
+			newStage.show();
+		}
 	}
 
 	private HBox buildCenter(NewsPanel newsPanel, ChartPanel chartPanel) {
