@@ -75,12 +75,7 @@ public class Main extends Application {
 				System.out.println("영향: " + effect);
 				System.out.println("턴: " + turn);
 
-				chartPanel.addCandle(effect);  // 턴마다 새 캔들 추가 (표시 중 종목은 onPriceChanged로 목록 동기화)
-
-				// 차트에 표시 중이 아닌 나머지 종목들의 시세도 함께 갱신
-				if (stockListRef != null) {
-					stockListRef.advanceMarket(effect, chartPanel.getCurrentStock());
-				}
+				chartPanel.addCandle(effect);  // 턴마다 새 캔들 추가
 			});
 
 			newsPanel.setImageClickHandler(imageView -> {
@@ -305,9 +300,6 @@ public class Main extends Application {
 			order.setSelectedStock(name, price);
 			chartPanel.showStock(name, price);
 		});
-
-		// 차트 현재가가 바뀌면(턴마다 캔들 추가) 주식 목록의 해당 종목 가격·추세점도 갱신
-		chartPanel.setOnPriceChanged((name, price) -> stockList.updatePrice(name, price));
 
 		wallet.setOnHoldingSelected(name -> {            // 보유 주식 선택 → 매도모드
 			long price = stockList.getPrice(name);

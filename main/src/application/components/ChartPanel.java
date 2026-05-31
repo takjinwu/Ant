@@ -15,7 +15,6 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 
 import java.util.Arrays;
-import java.util.function.BiConsumer;
 
 /**
  * ChartPanel — 화면설계서 v1 반영
@@ -74,11 +73,6 @@ public class ChartPanel extends VBox {
     private Label tooltipBox;
     private boolean showCandle = true;
     private double mouseX = -1, mouseY = -1;
-
-    /** 현재 차트에 표시 중인 종목명 (주식 목록 동기화용) */
-    private String currentStock = "삼성전자";
-    /** 캔들이 추가되어 현재가가 바뀔 때 (종목명, 새 종가) 를 통지하는 콜백 */
-    private BiConsumer<String, Long> onPriceChanged = null;
 
     public ChartPanel(double width, double height) {
         this.panelW = width;
@@ -237,16 +231,6 @@ public class ChartPanel extends VBox {
         return new StackPane(volCanvas);
     }
 
-    /** 캔들 추가로 현재가가 바뀔 때 호출될 리스너 등록 (주식 목록 동기화용) */
-    public void setOnPriceChanged(BiConsumer<String, Long> listener) {
-        this.onPriceChanged = listener;
-    }
-
-    /** 현재 차트에 표시 중인 종목명 */
-    public String getCurrentStock() {
-        return currentStock;
-    }
-
     public void applyNewsEffect(double effect) {
         System.out.println("[ChartPanel] 뉴스 효과: " + effect + "%");
         redraw();
@@ -286,15 +270,9 @@ public class ChartPanel extends VBox {
 
         updateHeaderPriceFromLatestCandle();
         redraw();
-
-        // 변경된 현재가(종가)를 주식 목록 등 외부에 통지
-        if (onPriceChanged != null) {
-            onPriceChanged.accept(currentStock, Math.round(close));
-        }
     }
 
     public void showStock(String name, long price) {
-        this.currentStock = name;
         this.data = generateSeries(name, price);
 
         boolean darkText = "카카오".equals(name);
@@ -365,7 +343,7 @@ public class ChartPanel extends VBox {
      * 200,000 ~ 500,000원 미만→ 500원
      * 500,000원 이상         → 1,000원
      */
-    public static double roundToTick(double price) {
+    private static double roundToTick(double price) {
         long tick;
         if      (price <   2_000) tick = 1;
         else if (price <   5_000) tick = 5;
