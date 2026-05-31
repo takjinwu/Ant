@@ -17,7 +17,7 @@ import javafx.util.Duration;
 
 public class NewsPanel extends Pane {
 
-	private static final String FONT = "Moneygraphy Rounded";
+	private static final String FONT = "SUIT";
 
 	private final javafx.scene.layout.StackPane card;
 	private final Label timeLabel;

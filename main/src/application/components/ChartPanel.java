@@ -113,7 +113,7 @@ public class ChartPanel extends VBox {
         badge.setStyle(
             "-fx-background-color: #1428A0;" +
             "-fx-text-fill: white;" +
-            "-fx-font-family: 'Moneygraphy Rounded';" +
+            "-fx-font-family: 'SUIT';" +
             "-fx-font-weight: bold;" +
             "-fx-font-size: 12px;" +
             "-fx-padding: 6 10 6 10;" +
@@ -123,14 +123,14 @@ public class ChartPanel extends VBox {
         nameLabel = new Label("삼성전자 005930");
         nameLabel.setStyle(
             "-fx-text-fill: rgba(255,255,255,0.75);" +
-            "-fx-font-family: 'Moneygraphy Rounded';" +
+            "-fx-font-family: 'SUIT';" +
             "-fx-font-size: 12px;"
         );
 
         priceLabel = new Label("83,000원");
         priceLabel.setStyle(
             "-fx-text-fill: #ff6b6b;" +
-            "-fx-font-family: 'Moneygraphy Rounded';" +
+            "-fx-font-family: 'SUIT';" +
             "-fx-font-weight: bold;" +
             "-fx-font-size: 24px;"
         );
@@ -149,7 +149,7 @@ public class ChartPanel extends VBox {
         candleBtn.setSelected(true);
 
         String btnBase =
-            "-fx-font-family: 'Moneygraphy Rounded';" +
+            "-fx-font-family: 'SUIT';" +
             "-fx-font-size: 13px;" +
             "-fx-cursor: hand;" +
             "-fx-background-radius: 6;" +
@@ -182,7 +182,7 @@ public class ChartPanel extends VBox {
         tooltipBox.setStyle(
             "-fx-background-color: rgba(20,24,50,0.92);" +
             "-fx-text-fill: white;" +
-            "-fx-font-family: 'Moneygraphy Rounded';" +
+            "-fx-font-family: 'SUIT';" +
             "-fx-font-size: 12px;" +
             "-fx-padding: 10 14 10 14;" +
             "-fx-background-radius: 8;" +
@@ -281,6 +281,65 @@ public class ChartPanel extends VBox {
         redraw();
     }
 
+
+    /**
+     * 턴이 넘어갈 때 호출 — stocksMap에 있는 모든 종목의 캐시 데이터에 새 캔들을 추가합니다.
+     * 아직 한 번도 클릭하지 않은 종목도 미리 초기화하여 캔들을 누적합니다.
+     *
+     * @param stocksMap 종목명 → 초기가격 맵 (StockListPanel.getStocks() 에서 전달)
+     * @param effect    뉴스 효과 (정수 %)
+     */
+    public void addCandleToAll(java.util.Map<String, Long> stocksMap, int effect) {
+        java.util.Random r = new java.util.Random();
+
+        for (java.util.Map.Entry<String, Long> entry : stocksMap.entrySet()) {
+            String name  = entry.getKey();
+            long   price = entry.getValue();
+
+            // 캐시에 없으면 초기 시리즈 생성
+            double[][] stockData = dataCache.computeIfAbsent(name, k -> generateSeries(k, price));
+
+            double[] last      = stockData[stockData.length - 1];
+            double   prevClose = last[3];
+
+            double bias  = effect * 0.004;
+            double drift = bias + (r.nextDouble() - 0.5) * 0.04;
+            double open  = prevClose;
+            double close = open  * (1 + drift);
+            double high  = Math.max(open, close) * (1 + r.nextDouble() * 0.015);
+            double low   = Math.min(open, close) * (1 - r.nextDouble() * 0.015);
+            double vol   = 500_000 + r.nextDouble() * 1_500_000;
+
+            open  = roundToTick(open);
+            close = roundToTick(close);
+            high  = roundToTick(high);
+            low   = roundToTick(low);
+
+            double[][] newData = new double[stockData.length + 1][5];
+            System.arraycopy(stockData, 0, newData, 0, stockData.length);
+            newData[stockData.length] = new double[]{open, high, low, close, vol};
+            dataCache.put(name, newData);
+
+            // 현재 보고 있는 종목이면 화면 데이터도 동기화
+            if (name.equals(currentStockName)) {
+                data = newData;
+            }
+        }
+
+        updateHeaderPriceFromLatestCandle();
+        redraw();
+    }
+
+    /**
+     * dataCache 기준으로 특정 종목의 마지막 종가를 반환합니다.
+     * 캐시에 없으면 0을 반환합니다.
+     */
+    public long getLastClosePriceFor(String name) {
+        double[][] d = dataCache.get(name);
+        if (d == null || d.length == 0) return 0L;
+        return (long) d[d.length - 1][3];
+    }
+
     public void showStock(String name, long price) {
         this.currentStockName = name;
         // 캐시에 없을 때만 새로 생성 — 기존 addCandle 데이터를 보존
@@ -291,7 +350,7 @@ public class ChartPanel extends VBox {
         badge.setStyle(
             "-fx-background-color: " + brandColor(name) + ";" +
             "-fx-text-fill: " + (darkText ? "#1A1A1A" : "white") + ";" +
-            "-fx-font-family: 'Moneygraphy Rounded';" +
+            "-fx-font-family: 'SUIT';" +
             "-fx-font-weight: bold;" +
             "-fx-font-size: 12px;" +
             "-fx-padding: 6 10 6 10;" +
@@ -400,7 +459,7 @@ public class ChartPanel extends VBox {
         priceLabel.setText(String.format("%,.0f원", last[3]));
         priceLabel.setStyle(
             "-fx-text-fill: " + (bull ? "#ff6b6b" : "#4A9EFF") + ";" +
-            "-fx-font-family: 'Moneygraphy Rounded';" +
+            "-fx-font-family: 'SUIT';" +
             "-fx-font-weight: bold;" +
             "-fx-font-size: 24px;"
         );
@@ -466,7 +525,7 @@ public class ChartPanel extends VBox {
         double barW = chartW / n;
         double candleW = Math.max(barW * 0.55, 4);
 
-        gc.setFont(Font.font("Moneygraphy Rounded", 10));
+        gc.setFont(Font.font("SUIT", 10));
         gc.setFill(Color.web("#8899aa"));
         gc.setStroke(Color.web("#ffffff", 0.07));
         gc.setLineWidth(1);
@@ -538,7 +597,7 @@ public class ChartPanel extends VBox {
                 gc.setFill(Color.web("#ffffff", 0.92));
                 gc.fillRoundRect(cw - AXIS_W, mouseY - 10, AXIS_W - 2, 20, 5, 5);
                 gc.setFill(Color.web("#06124A"));
-                gc.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 10));
+                gc.setFont(Font.font("SUIT", FontWeight.BOLD, 10));
                 gc.fillText(String.format("%,d", (long) curPrice), cw - AXIS_W + 4, mouseY + 4);
             }
             gc.setLineDashes();
@@ -572,7 +631,7 @@ public class ChartPanel extends VBox {
         }
 
         gc.setFill(Color.web("#8899aa"));
-        gc.setFont(Font.font("Moneygraphy Rounded", 10));
+        gc.setFont(Font.font("SUIT", 10));
         gc.fillText(String.format("%,.0f", maxVol), cw - AXIS_W + 4, 12);
         gc.fillText(String.format("%,.0f", maxVol / 2), cw - AXIS_W + 4, ch / 2 + 4);
 
@@ -612,7 +671,7 @@ public class ChartPanel extends VBox {
         priceLabel.setText(String.format("%,.0f원", d[3]));
         priceLabel.setStyle(
             "-fx-text-fill: " + (bull ? "#ff6b6b" : "#4A9EFF") + ";" +
-            "-fx-font-family: 'Moneygraphy Rounded';" +
+            "-fx-font-family: 'SUIT';" +
             "-fx-font-weight: bold;" +
             "-fx-font-size: 24px;"
         );

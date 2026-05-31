@@ -1,17 +1,25 @@
+@font-face {
+    src: url("fonts/SUIT-Regular.ttf");
+}
+
+@font-face {
+    src: url("fonts/SUIT-Bold.ttf");
+}
+
 .root {
-    -fx-font-family: "Moneygraphy Rounded";
+    -fx-font-family: "SUIT";
 }
 
 .label {
-    -fx-font-family: "Moneygraphy Rounded";
+    -fx-font-family: "SUIT";
 }
 
 .button {
-    -fx-font-family: "Moneygraphy Rounded";
+    -fx-font-family: "SUIT";
 }
 
 .text-field {
-    -fx-font-family: "Moneygraphy Rounded";
+    -fx-font-family: "SUIT";
 }
 
 /* Glassmorphism card — subtle two-tone gradient + soft border + drop shadow */

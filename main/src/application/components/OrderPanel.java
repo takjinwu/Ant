@@ -72,16 +72,16 @@ public class OrderPanel extends VBox {
 
         // ── 헤더 ──
         Label header = new Label("📋  주문");
-        header.setFont(Font.font("Moneygraphy Rounded", FontWeight.EXTRA_BOLD, 17));
+        header.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 17));
         header.setTextFill(Color.WHITE);
 
         // ── 종목 정보 ──
         selectedLabel = new Label("종목을 선택하세요");
-        selectedLabel.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 15));
+        selectedLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 15));
         selectedLabel.setTextFill(Color.web("#C8D8FF"));
 
         priceLabel = new Label("현재가: ─");
-        priceLabel.setFont(Font.font("Moneygraphy Rounded", 13));
+        priceLabel.setFont(Font.font("SUIT", 13));
         priceLabel.setTextFill(Color.web("#8899BB"));
 
         VBox infoBox = new VBox(3, selectedLabel, priceLabel);
@@ -93,7 +93,7 @@ public class OrderPanel extends VBox {
 
         // ── 퀵 비율 버튼 (10% / 25% / 50% / 전부) ──
         ratioHeader = new Label("비율 매수");
-        ratioHeader.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 12));
+        ratioHeader.setFont(Font.font("SUIT", FontWeight.BOLD, 12));
         ratioHeader.setTextFill(Color.web("#AAB4D4"));
 
         Button btn10   = buildRatioButton("10%",  0.10);
@@ -106,11 +106,11 @@ public class OrderPanel extends VBox {
 
         // ── 수량 입력 ──
         Label qtyHeader = new Label("수량 (주)");
-        qtyHeader.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 12));
+        qtyHeader.setFont(Font.font("SUIT", FontWeight.BOLD, 12));
         qtyHeader.setTextFill(Color.web("#AAB4D4"));
 
         qtyField = new TextField("0");
-        qtyField.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 16));
+        qtyField.setFont(Font.font("SUIT", FontWeight.BOLD, 16));
         qtyField.setStyle(
             "-fx-background-color: rgba(255,255,255,0.10);" +
             "-fx-text-fill: #E8F0FF;" +
@@ -139,7 +139,7 @@ public class OrderPanel extends VBox {
 
         // ── 피드백 라벨 ──
         feedbackLabel = new Label("");
-        feedbackLabel.setFont(Font.font("Moneygraphy Rounded", 12));
+        feedbackLabel.setFont(Font.font("SUIT", 12));
         feedbackLabel.setTextFill(Color.web("#FFD580"));
         feedbackLabel.setWrapText(true);
 
@@ -290,7 +290,7 @@ public class OrderPanel extends VBox {
         Label toastLabel = new Label(
             icon + "  " + stockName + "  " + qty + "주  " + typeText + " 주문이 체결됐습니다"
         );
-        toastLabel.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 18));
+        toastLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 18));
         toastLabel.setTextFill(Color.web(textCol));
         toastLabel.setStyle(
             "-fx-background-color: " + color + ";" +
@@ -360,7 +360,7 @@ public class OrderPanel extends VBox {
 
     private Button buildRatioButton(String text, double ratio) {
         Button btn = new Button(text);
-        btn.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 12));
+        btn.setFont(Font.font("SUIT", FontWeight.BOLD, 12));
         btn.setPrefWidth(62);
         btn.setStyle(
             "-fx-background-color: rgba(255,255,255,0.13);" +

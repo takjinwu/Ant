@@ -60,16 +60,16 @@ public class WalletPanel extends VBox {
 
         // ── 헤더 ──
         Label header = new Label("💼  내 지갑");
-        header.setFont(Font.font("Moneygraphy Rounded", FontWeight.EXTRA_BOLD, 17));
+        header.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 17));
         header.setTextFill(Color.web("#FFFFFF"));
 
         // ── 현금 섹션 ──
         Label cashLabel = new Label("보유 현금");
-        cashLabel.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 13));
+        cashLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
         cashLabel.setTextFill(Color.web("#AAB4D4"));
 
         cashValueLabel = new Label(formatMoney(cash) + " 원");
-        cashValueLabel.setFont(Font.font("Moneygraphy Rounded", FontWeight.EXTRA_BOLD, 22));
+        cashValueLabel.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 22));
         cashValueLabel.setTextFill(Color.web("#7EDDFF"));
         cashValueLabel.setStyle(
             "-fx-effect: dropshadow(gaussian, rgba(126,221,255,0.45), 10, 0.3, 0, 0);"
@@ -84,7 +84,7 @@ public class WalletPanel extends VBox {
 
         // ── 보유 주식 섹션 ──
         Label stockHeader = new Label("보유 주식");
-        stockHeader.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 13));
+        stockHeader.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
         stockHeader.setTextFill(Color.web("#AAB4D4"));
 
         stockListBox = new VBox(6);
@@ -92,7 +92,7 @@ public class WalletPanel extends VBox {
 
         // 빈 안내 문구
         Label empty = new Label("보유 주식이 없습니다.");
-        empty.setFont(Font.font("Moneygraphy Rounded", 13));
+        empty.setFont(Font.font("SUIT", 13));
         empty.setTextFill(Color.web("#667799"));
         stockListBox.getChildren().add(empty);
 
@@ -183,7 +183,7 @@ public class WalletPanel extends VBox {
 
         if (holdings.isEmpty()) {
             Label empty = new Label("보유 주식이 없습니다.");
-            empty.setFont(Font.font("Moneygraphy Rounded", 13));
+            empty.setFont(Font.font("SUIT", 13));
             empty.setTextFill(Color.web("#667799"));
             stockListBox.getChildren().add(empty);
             return;
@@ -196,18 +196,18 @@ public class WalletPanel extends VBox {
 
     private HBox buildStockRow(String name, int[] info) {
         Label nameLabel = new Label(name);
-        nameLabel.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 13));
+        nameLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
         nameLabel.setTextFill(Color.web("#E0E8FF"));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Label qtyLabel = new Label(info[0] + "주");
-        qtyLabel.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 13));
+        qtyLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
         qtyLabel.setTextFill(Color.web("#FFD580"));
 
         Label avgLabel = new Label("평균 " + formatMoney(info[1]) + "원");
-        avgLabel.setFont(Font.font("Moneygraphy Rounded", 12));
+        avgLabel.setFont(Font.font("SUIT", 12));
         avgLabel.setTextFill(Color.web("#8899BB"));
 
         VBox rightBox = new VBox(2, qtyLabel, avgLabel);

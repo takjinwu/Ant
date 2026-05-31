@@ -16,6 +16,7 @@ import javafx.scene.text.FontWeight;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Collections;
 import java.util.function.BiConsumer;
 
 /**
@@ -53,18 +54,18 @@ public class StockListPanel extends VBox {
         setSpacing(14);
 
         Label header = new Label("📈 주식 목록");
-        header.setFont(Font.font("Moneygraphy Rounded", FontWeight.EXTRA_BOLD, 17));
+        header.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 17));
         header.setTextFill(Color.web("#FFFFFF"));
 
         Label nameCol = new Label("종목명");
-        nameCol.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 12));
+        nameCol.setFont(Font.font("SUIT", FontWeight.BOLD, 12));
         nameCol.setTextFill(Color.web("#AAB4D4"));
 
         Region headSpacer = new Region();
         HBox.setHgrow(headSpacer, Priority.ALWAYS);
 
         Label priceCol = new Label("현재가");
-        priceCol.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 12));
+        priceCol.setFont(Font.font("SUIT", FontWeight.BOLD, 12));
         priceCol.setTextFill(Color.web("#AAB4D4"));
 
         HBox colHeader = new HBox(8, nameCol, headSpacer, priceCol);
@@ -121,6 +122,26 @@ public class StockListPanel extends VBox {
         return stocks.getOrDefault(stockName, 0L);
     }
 
+
+    /** 전체 종목 맵을 반환합니다 (ChartPanel.addCandleToAll 에 전달용). */
+    public java.util.Map<String, Long> getStocks() {
+        return java.util.Collections.unmodifiableMap(stocks);
+    }
+
+    /**
+     * 모든 종목의 가격을 ChartPanel 캐시 기준으로 일괄 업데이트합니다.
+     * 턴이 넘어갈 때 Main.java에서 호출합니다.
+     */
+    public void updateAllPrices(ChartPanel cp) {
+        for (java.util.Map.Entry<String, Long> entry : stocks.entrySet()) {
+            String name = entry.getKey();
+            long newPrice = cp.getLastClosePriceFor(name);
+            if (newPrice > 0) {
+                updatePrice(name, newPrice);
+            }
+        }
+    }
+
     public void updatePrice(String stockName, long price) {
         if (!stocks.containsKey(stockName)) return;
 
@@ -150,14 +171,14 @@ public class StockListPanel extends VBox {
         trendDot.setEffect(new DropShadow(8, trendColor));
 
         Label nameLabel = new Label(name);
-        nameLabel.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 14));
+        nameLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 14));
         nameLabel.setTextFill(Color.web("#E0E8FF"));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Label priceLabel = new Label(formatMoney(price) + " 원");
-        priceLabel.setFont(Font.font("Moneygraphy Rounded", FontWeight.BOLD, 14));
+        priceLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 14));
         priceLabel.setTextFill(Color.web("#7EDDFF"));
 
         VBox rightBox = new VBox(priceLabel);

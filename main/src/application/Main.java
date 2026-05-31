@@ -49,10 +49,18 @@ public class Main extends Application {
 	public void start(Stage primaryStage) {
 		try {
 			
-			// ── Moneygraphy Rounded 폰트 로드 (Canvas 렌더링용) ──
-			Font.loadFont(getClass().getResourceAsStream("fonts/Moneygraphy-Rounded.ttf"), 12);
-			Font loadedFont = Font.loadFont(getClass().getResourceAsStream("fonts/Moneygraphy-Rounded.ttf"), 34);
+			// ── SUIT 폰트 로드 (Canvas 렌더링용) ──
+			java.io.InputStream regularStream = getClass().getResourceAsStream("fonts/SUIT-Regular.ttf");
+			java.io.InputStream boldStream    = getClass().getResourceAsStream("fonts/SUIT-Bold.ttf");
+			System.out.println("[폰트 진단] SUIT-Regular 스트림: " + (regularStream != null ? "OK" : "NULL ← 파일 없음!"));
+			System.out.println("[폰트 진단] SUIT-Bold    스트림: " + (boldStream    != null ? "OK" : "NULL ← 파일 없음!"));
+			Font regFont  = (regularStream != null) ? Font.loadFont(regularStream, 12) : null;
+			Font loadedFont = (boldStream  != null) ? Font.loadFont(boldStream,   34) : null;
+			System.out.println("[폰트 진단] Regular 로드 결과: " + (regFont     != null ? regFont.getFamily()     : "실패"));
+			System.out.println("[폰트 진단] Bold    로드 결과: " + (loadedFont  != null ? loadedFont.getFamily() : "실패"));
 			if (loadedFont != null) uiFontFamily = loadedFont.getFamily();
+			else uiFontFamily = "SUIT";
+			System.out.println("[폰트 진단] uiFontFamily = " + uiFontFamily);
 
 			BorderPane root = new BorderPane();
 			root.setPadding(new Insets(18));
@@ -74,13 +82,12 @@ public class Main extends Application {
 				System.out.println("영향: " + effect);
 				System.out.println("턴: " + turn);
 
-				chartPanel.addCandle(effect);  // 턴마다 새 캔들 추가
-
-				// 현재 선택 종목의 가격·점 색상을 실제 차트 데이터와 동기화
-				String curName = chartPanel.getCurrentStockName();
-				if (curName != null && !curName.isEmpty() && stockListRef != null) {
-					long newPrice = chartPanel.getLastClosePrice();
-					stockListRef.updatePrice(curName, newPrice);
+				// ── [핵심 수정] 모든 종목에 캔들 추가 → StockListPanel 가격 일괄 갱신 ──
+				if (stockListRef != null) {
+					chartPanel.addCandleToAll(stockListRef.getStocks(), effect);
+					stockListRef.updateAllPrices(chartPanel);
+				} else {
+					chartPanel.addCandle(effect);  // fallback (stockListRef 미설정 시)
 				}
 			});
 
