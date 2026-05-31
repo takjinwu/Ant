@@ -64,6 +64,7 @@ public class ChartPanel extends VBox {
 
     // ── 종목별 데이터 캐시 (버그 수정: 탭 전환 시 addCandle 데이터 유지) ──
     private final java.util.HashMap<String, double[][]> dataCache = new java.util.HashMap<>();
+    private final java.util.Set<String> delistedStocks = new java.util.HashSet<>();  // 상장폐지 종목
     private String currentStockName = "";
 
     private final double panelW;
@@ -317,6 +318,9 @@ public class ChartPanel extends VBox {
             String name  = entry.getKey();
             long   price = entry.getValue();
 
+            // ── 상장폐지 종목은 캔들 추가 안 함 ──
+            if (delistedStocks.contains(name)) continue;
+
             // 캐시에 없으면 초기 시리즈 생성
             double[][] stockData = dataCache.computeIfAbsent(name, k -> generateSeries(k, price));
 
@@ -354,6 +358,18 @@ public class ChartPanel extends VBox {
 
         updateHeaderPriceFromLatestCandle();
         redraw();
+    }
+
+    /**
+     * 종목을 상장폐지 처리합니다. 이후 addCandleToAll 에서 해당 종목을 건너뜁니다.
+     */
+    public void delistStock(String name) {
+        delistedStocks.add(name);
+    }
+
+    /** 상장폐지 여부 반환 */
+    public boolean isDelistedStock(String name) {
+        return delistedStocks.contains(name);
     }
 
     /**

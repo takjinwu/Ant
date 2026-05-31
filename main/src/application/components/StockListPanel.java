@@ -30,7 +30,9 @@ public class StockListPanel extends VBox {
 
     private final Map<String, Long> stocks = new LinkedHashMap<>();
     private final Map<String, Long> prevPrices = new LinkedHashMap<>();  // 이전 가격 (등락률 계산용)
+    private final java.util.Set<String> delistedStocks = new java.util.HashSet<>();  // 상장폐지 종목
     private BiConsumer<String, Long> onStockSelected = null;
+    private java.util.function.Consumer<String> onDelisted = null;  // 상장폐지 이벤트 콜백
 
     private final VBox rowBox;
     private HBox selectedRow = null;
@@ -124,9 +126,25 @@ public class StockListPanel extends VBox {
     }
 
 
-    /** 전체 종목 맵을 반환합니다 (ChartPanel.addCandleToAll 에 전달용). */
+    /** 전체 종목 맵을 반환합니다 (ChartPanel.addCandleToAll 에 전달용). 상장폐지 종목 제외. */
     public java.util.Map<String, Long> getStocks() {
-        return java.util.Collections.unmodifiableMap(stocks);
+        java.util.Map<String, Long> active = new java.util.LinkedHashMap<>();
+        for (var entry : stocks.entrySet()) {
+            if (!delistedStocks.contains(entry.getKey())) {
+                active.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return java.util.Collections.unmodifiableMap(active);
+    }
+
+    /** 상장폐지 이벤트 리스너 등록 */
+    public void setOnDelisted(java.util.function.Consumer<String> listener) {
+        this.onDelisted = listener;
+    }
+
+    /** 해당 종목이 상장폐지 상태인지 반환 */
+    public boolean isDelisted(String name) {
+        return delistedStocks.contains(name);
     }
 
     /**
@@ -145,6 +163,14 @@ public class StockListPanel extends VBox {
 
     public void updatePrice(String stockName, long price) {
         if (!stocks.containsKey(stockName)) return;
+        if (delistedStocks.contains(stockName)) return;  // 이미 상장폐지된 종목은 무시
+
+        // ── 1,000원 미만 → 상장폐지 ──
+        if (price < 1_000) {
+            stocks.put(stockName, price);
+            triggerDelist(stockName);
+            return;
+        }
 
         stocks.put(stockName, price);
 
@@ -279,6 +305,72 @@ public class StockListPanel extends VBox {
         row.setOnMouseClicked(e -> selectRow(row, name, price));
 
         return row;
+    }
+
+    /**
+     * 상장폐지 처리 — 해당 종목 행을 비활성화하고 상장폐지 뱃지를 표시합니다.
+     */
+    private void triggerDelist(String name) {
+        delistedStocks.add(name);
+
+        for (var node : rowBox.getChildren()) {
+            if (!(node instanceof HBox row)) continue;
+            if (!name.equals(row.getUserData())) continue;
+
+            // 클릭/호버 이벤트 제거
+            row.setOnMouseClicked(null);
+            row.setOnMouseEntered(null);
+            row.setOnMouseExited(null);
+            row.setStyle(
+                "-fx-background-color: rgba(120,30,30,0.18);" +
+                "-fx-background-radius: 12;" +
+                "-fx-cursor: default;" +
+                "-fx-opacity: 0.62;"
+            );
+
+            // 상태 점 → 회색
+            Circle trendDot = (Circle) row.getChildren().get(0);
+            trendDot.setFill(Color.web("#888888"));
+            trendDot.setEffect(null);
+
+            // 종목명 → 회색
+            Label nameLabel = (Label) row.getChildren().get(1);
+            nameLabel.setTextFill(Color.web("#999999"));
+
+            // 가격/등락률 → 상장폐지 표시
+            VBox rightBox = (VBox) row.getChildren().get(3);
+            Label priceLabel  = (Label) rightBox.getChildren().get(0);
+            Label changeLabel = (Label) rightBox.getChildren().get(1);
+
+            priceLabel.setText("상장폐지");
+            priceLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
+            priceLabel.setTextFill(Color.web("#FF5555"));
+
+            changeLabel.setText("거래정지");
+            changeLabel.setStyle(
+                "-fx-text-fill: #FF5555;" +
+                "-fx-font-family: 'SUIT';" +
+                "-fx-font-weight: bold;" +
+                "-fx-font-size: 10px;" +
+                "-fx-padding: 2 6 2 6;" +
+                "-fx-background-color: rgba(255,50,50,0.20);" +
+                "-fx-background-radius: 5;" +
+                "-fx-border-color: rgba(255,80,80,0.55);" +
+                "-fx-border-radius: 5;" +
+                "-fx-border-width: 1;"
+            );
+            break;
+        }
+
+        // 선택 중이던 행이 상장폐지되면 선택 해제
+        if (selectedRow != null && name.equals(selectedRow.getUserData())) {
+            selectedRow = null;
+        }
+
+        // 콜백 발화
+        if (onDelisted != null) {
+            javafx.application.Platform.runLater(() -> onDelisted.accept(name));
+        }
     }
 
     private void selectRow(HBox row, String name, long price) {

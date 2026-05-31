@@ -58,6 +58,7 @@ public class Main extends Application {
 
 	private Stage currentStage;
 	private Scene mainScene;
+	private WalletPanel walletRef;
 
 	private enum DisplayMode {
 		FULLSCREEN,
@@ -166,6 +167,79 @@ public class Main extends Application {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	private void showDelistNotice(String stockName, long lostValue) {
+		Label icon  = new Label("📉");
+		icon.setStyle("-fx-font-size: 42px;");
+
+		Label title = new Label("상장폐지");
+		title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 28));
+		title.setTextFill(Color.web("#FF5555"));
+
+		Label nameLabel = new Label(stockName);
+		nameLabel.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 20));
+		nameLabel.setTextFill(Color.WHITE);
+
+		Label desc = new Label("주가가 1,000원 미만으로 하락하여\n상장 요건을 충족하지 못했습니다.");
+		desc.setFont(Font.font(uiFontFamily, 14));
+		desc.setTextFill(Color.web("#BBCCDD"));
+		desc.setStyle("-fx-text-alignment: center;");
+		desc.setWrapText(true);
+
+		Label lossLabel;
+		if (lostValue > 0) {
+			lossLabel = new Label(String.format("보유 주식 손실: -%,d 원", lostValue));
+			lossLabel.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 15));
+			lossLabel.setTextFill(Color.web("#FF7777"));
+			lossLabel.setStyle(
+				"-fx-background-color: rgba(255,50,50,0.18);" +
+				"-fx-background-radius: 10;" +
+				"-fx-padding: 8 18 8 18;"
+			);
+		} else {
+			lossLabel = new Label("보유 주식 없음 — 직접 손실 없음");
+			lossLabel.setFont(Font.font(uiFontFamily, 14));
+			lossLabel.setTextFill(Color.web("#88AACC"));
+		}
+
+		Button closeBtn = new Button("확인");
+		closeBtn.setStyle(
+			"-fx-background-color: rgba(255,85,85,0.75);" +
+			"-fx-text-fill: white;" +
+			"-fx-font-family: '" + uiFontFamily + "';" +
+			"-fx-font-size: 16px;" +
+			"-fx-font-weight: bold;" +
+			"-fx-background-radius: 16;" +
+			"-fx-padding: 10 36 10 36;" +
+			"-fx-cursor: hand;"
+		);
+
+		VBox card = new VBox(14, icon, title, nameLabel, desc, lossLabel, closeBtn);
+		card.setAlignment(Pos.CENTER);
+		card.setPadding(new Insets(36, 48, 36, 48));
+		card.setMaxWidth(420);
+		card.setStyle(
+			"-fx-background-color: linear-gradient(to bottom right," +
+				"rgba(80,10,10,0.92), rgba(30,10,50,0.95));" +
+			"-fx-background-radius: 28;" +
+			"-fx-border-color: rgba(255,80,80,0.55);" +
+			"-fx-border-radius: 28;" +
+			"-fx-border-width: 1.5;" +
+			"-fx-effect: dropshadow(gaussian, rgba(255,50,50,0.45), 40, 0.3, 0, 0);"
+		);
+
+		// 오버레이 배경
+		javafx.scene.layout.StackPane overlay = new javafx.scene.layout.StackPane(card);
+		overlay.setStyle("-fx-background-color: rgba(0,0,0,0.55);");
+
+		appRoot.getChildren().add(overlay);
+
+		closeBtn.setOnAction(e -> appRoot.getChildren().remove(overlay));
+		// 오버레이 클릭 시 닫기
+		overlay.setOnMouseClicked(e -> {
+			if (e.getTarget() == overlay) appRoot.getChildren().remove(overlay);
+		});
 	}
 
 	private void showStartNotice(NewsPanel newsPanel) {
@@ -552,9 +626,20 @@ public class Main extends Application {
 		WalletPanel wallet = new WalletPanel(370, BOTTOM_H);
 		StockListPanel stockList = new StockListPanel(520, COLUMN_H);
 		stockListRef = stockList;
+		walletRef = wallet;
 
 		order.setWallet(wallet);
 		stockList.setChartPanel(chartPanel);
+
+		// ── 상장폐지 이벤트 처리 ──
+		stockList.setOnDelisted(name -> {
+			// ChartPanel에 상장폐지 마킹 (이후 캔들 추가 차단)
+			chartPanel.delistStock(name);
+			// 지갑에서 해당 종목 강제 소각 (현금 환급 없음)
+			long lost = walletRef.delistStock(name);
+			// 상장폐지 안내 팝업
+			showDelistNotice(name, lost);
+		});
 
 		stockList.setOnStockSelected((name, price) -> {
 			order.setSelectedStock(name, price);

@@ -169,6 +169,19 @@ public class WalletPanel extends VBox {
         this.onHoldingSelected = listener;
     }
 
+    /**
+     * 상장폐지 처리 — 보유 중인 해당 종목을 강제 제거합니다 (현금 환급 없음).
+     * @return 소각된 평가금액 (보유수량 × 평균단가). 보유 없으면 0.
+     */
+    public long delistStock(String stockName) {
+        if (!holdings.containsKey(stockName)) return 0L;
+        int[] info = holdings.get(stockName);
+        long lostValue = (long) info[0] * info[1];
+        holdings.remove(stockName);
+        refresh();
+        return lostValue;
+    }
+
     /** 특정 종목 보유 수량 반환 (없으면 0) */
     public int getQuantity(String stockName) {
         int[] info = holdings.get(stockName);
