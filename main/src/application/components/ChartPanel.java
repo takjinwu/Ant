@@ -35,6 +35,7 @@ public class ChartPanel extends VBox {
     private static final double VOL_RATIO = 0.22;
     private static final double HEAD_H = 72;
     private static final int VISIBLE_CANDLES = 30;  // 화면에 표시할 최대 캔들 수
+    private static final double LIMIT_RATE = 0.30;  // 상한가/하한가 ±30%
 
     private static final double[][] SAMPLE_SERIES = {
         {60000, 65000, 58000, 62000, 900000},
@@ -271,8 +272,13 @@ public class ChartPanel extends VBox {
         double drift  = bias + (r.nextDouble() - 0.5) * 0.04;   // 랜덤 노이즈 ±2%
         double open   = prevClose;
         double close  = open * (1 + drift);
-        double high   = Math.max(open, close) * (1 + r.nextDouble() * 0.015);
-        double low    = Math.min(open, close) * (1 - r.nextDouble() * 0.015);
+
+        // ── 상한가/하한가 ±30% 클램프 (직전 종가 기준) ──
+        double upperLimit = prevClose * (1 + LIMIT_RATE);   // 상한가
+        double lowerLimit = prevClose * (1 - LIMIT_RATE);   // 하한가
+        close = Math.max(lowerLimit, Math.min(upperLimit, close));
+        double high   = Math.min(Math.max(open, close) * (1 + r.nextDouble() * 0.015), upperLimit);
+        double low    = Math.max(Math.min(open, close) * (1 - r.nextDouble() * 0.015), lowerLimit);
         double vol    = 500_000 + r.nextDouble() * 1_500_000;
 
         // 호가단위 반올림
@@ -321,8 +327,13 @@ public class ChartPanel extends VBox {
             double drift = bias + (r.nextDouble() - 0.5) * 0.04;
             double open  = prevClose;
             double close = open  * (1 + drift);
-            double high  = Math.max(open, close) * (1 + r.nextDouble() * 0.015);
-            double low   = Math.min(open, close) * (1 - r.nextDouble() * 0.015);
+
+            // ── 상한가/하한가 ±30% 클램프 (직전 종가 기준) ──
+            double upperLimit = prevClose * (1 + LIMIT_RATE);
+            double lowerLimit = prevClose * (1 - LIMIT_RATE);
+            close = Math.max(lowerLimit, Math.min(upperLimit, close));
+            double high  = Math.min(Math.max(open, close) * (1 + r.nextDouble() * 0.015), upperLimit);
+            double low   = Math.max(Math.min(open, close) * (1 - r.nextDouble() * 0.015), lowerLimit);
             double vol   = 500_000 + r.nextDouble() * 1_500_000;
 
             open  = roundToTick(open);
@@ -357,7 +368,7 @@ public class ChartPanel extends VBox {
 
     /**
      * 특정 종목의 최신 등락률(%)을 반환합니다.
-     * 전 캔들 종가 대비 현재 캔들 종가 변화율.
+     * 직전 캔들 종가 기준 turn-over-turn 변화율.
      */
     public double getChangePercentFor(String name, long price) {
         double[][] d = dataCache.computeIfAbsent(name, k -> generateSeries(k, price));
@@ -366,6 +377,26 @@ public class ChartPanel extends VBox {
         double prevClose = (d.length >= 2) ? d[d.length - 2][3] : last[0];
         if (prevClose == 0) return 0.0;
         return (last[3] - prevClose) / prevClose * 100.0;
+    }
+
+    /**
+     * 상한가(+30%) 도달 여부를 반환합니다.
+     */
+    public boolean isUpperLimitFor(String name, long price) {
+        double[][] d = dataCache.get(name);
+        if (d == null || d.length < 2) return false;
+        double prevClose = d[d.length - 2][3];
+        return prevClose > 0 && d[d.length - 1][3] >= prevClose * (1 + LIMIT_RATE) * 0.999;
+    }
+
+    /**
+     * 하한가(-30%) 도달 여부를 반환합니다.
+     */
+    public boolean isLowerLimitFor(String name, long price) {
+        double[][] d = dataCache.get(name);
+        if (d == null || d.length < 2) return false;
+        double prevClose = d[d.length - 2][3];
+        return prevClose > 0 && d[d.length - 1][3] <= prevClose * (1 - LIMIT_RATE) * 1.001;
     }
 
     public void showStock(String name, long price) {
@@ -482,14 +513,20 @@ public class ChartPanel extends VBox {
         if (data == null || data.length == 0) return;
 
         double[] last = data[data.length - 1];
-        boolean bull = last[3] >= last[0];
 
-        // 등락률: 전 캔들 종가 대비 변화율 (첫 캔들이면 open→close)
+        // ── 등락률: 직전 캔들 종가 기준 (turn-over-turn) ──
         double prevClose = (data.length >= 2) ? data[data.length - 2][3] : last[0];
         double changePct = (prevClose != 0) ? (last[3] - prevClose) / prevClose * 100.0 : 0.0;
+        boolean bull = changePct >= 0;
+
+        // ── 상한가/하한가 도달 판정 ──
+        boolean isUpperLimit = (prevClose > 0) && (last[3] >= prevClose * (1 + LIMIT_RATE) * 0.999);
+        boolean isLowerLimit = (prevClose > 0) && (last[3] <= prevClose * (1 - LIMIT_RATE) * 1.001);
+
         String sign = changePct >= 0 ? "+" : "";
         String colorHex = bull ? "#ff6b6b" : "#4A9EFF";
         String bgColor  = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
+        String limitBg  = isUpperLimit ? "rgba(255,50,50,0.35)" : "rgba(50,100,255,0.35)";
 
         priceLabel.setText(String.format("%,.0f원", last[3]));
         priceLabel.setStyle(
@@ -499,16 +536,46 @@ public class ChartPanel extends VBox {
             "-fx-font-size: 24px;"
         );
 
-        changeLabel.setText(String.format("%s%.2f%%", sign, changePct));
-        changeLabel.setStyle(
-            "-fx-text-fill: " + colorHex + ";" +
-            "-fx-font-family: 'SUIT';" +
-            "-fx-font-weight: bold;" +
-            "-fx-font-size: 15px;" +
-            "-fx-padding: 4 8 4 8;" +
-            "-fx-background-color: " + bgColor + ";" +
-            "-fx-background-radius: 6;"
-        );
+        if (isUpperLimit) {
+            changeLabel.setText(String.format("+%.2f%%  ▲ 상한가", changePct));
+            changeLabel.setStyle(
+                "-fx-text-fill: #FF4040;" +
+                "-fx-font-family: 'SUIT';" +
+                "-fx-font-weight: bold;" +
+                "-fx-font-size: 14px;" +
+                "-fx-padding: 4 10 4 10;" +
+                "-fx-background-color: " + limitBg + ";" +
+                "-fx-background-radius: 6;" +
+                "-fx-border-color: rgba(255,80,80,0.6);" +
+                "-fx-border-radius: 6;" +
+                "-fx-border-width: 1;"
+            );
+        } else if (isLowerLimit) {
+            changeLabel.setText(String.format("%.2f%%  ▼ 하한가", changePct));
+            changeLabel.setStyle(
+                "-fx-text-fill: #4A9EFF;" +
+                "-fx-font-family: 'SUIT';" +
+                "-fx-font-weight: bold;" +
+                "-fx-font-size: 14px;" +
+                "-fx-padding: 4 10 4 10;" +
+                "-fx-background-color: " + limitBg + ";" +
+                "-fx-background-radius: 6;" +
+                "-fx-border-color: rgba(80,120,255,0.6);" +
+                "-fx-border-radius: 6;" +
+                "-fx-border-width: 1;"
+            );
+        } else {
+            changeLabel.setText(String.format("%s%.2f%%", sign, changePct));
+            changeLabel.setStyle(
+                "-fx-text-fill: " + colorHex + ";" +
+                "-fx-font-family: 'SUIT';" +
+                "-fx-font-weight: bold;" +
+                "-fx-font-size: 15px;" +
+                "-fx-padding: 4 8 4 8;" +
+                "-fx-background-color: " + bgColor + ";" +
+                "-fx-background-radius: 6;"
+            );
+        }
     }
 
     private static String brandColor(String name) {

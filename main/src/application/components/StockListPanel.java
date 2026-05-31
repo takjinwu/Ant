@@ -148,10 +148,13 @@ public class StockListPanel extends VBox {
 
         stocks.put(stockName, price);
 
-        // ── 등락률: ChartPanel 캔들 데이터 기준 (차트 헤더와 동일한 계산식) ──
+        // ── 등락률: ChartPanel 직전 캔들 종가 기준 (turn-over-turn) ──
         double changePct;
+        boolean upperLimit = false, lowerLimit = false;
         if (chartPanel != null) {
-            changePct = chartPanel.getChangePercentFor(stockName, price);
+            changePct   = chartPanel.getChangePercentFor(stockName, price);
+            upperLimit  = chartPanel.isUpperLimitFor(stockName, price);
+            lowerLimit  = chartPanel.isLowerLimitFor(stockName, price);
         } else {
             long oldPrice = prevPrices.getOrDefault(stockName, price);
             changePct = (oldPrice != 0) ? (price - oldPrice) / (double) oldPrice * 100.0 : 0.0;
@@ -159,9 +162,7 @@ public class StockListPanel extends VBox {
         prevPrices.put(stockName, price);
 
         boolean bull = changePct >= 0;
-        String sign = bull ? "+" : "";
         String colorHex = bull ? "#ff6b6b" : "#4A9EFF";
-        String bgColor  = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
 
         for (var node : rowBox.getChildren()) {
             if (node instanceof HBox row && stockName.equals(row.getUserData())) {
@@ -177,16 +178,49 @@ public class StockListPanel extends VBox {
                 priceLabel.setText(formatMoney(price) + " 원");
                 priceLabel.setTextFill(Color.web(colorHex));
 
-                changeLabel.setText(String.format("%s%.2f%%", sign, changePct));
-                changeLabel.setStyle(
-                    "-fx-text-fill: " + colorHex + ";" +
-                    "-fx-font-family: 'SUIT';" +
-                    "-fx-font-weight: bold;" +
-                    "-fx-font-size: 11px;" +
-                    "-fx-padding: 2 6 2 6;" +
-                    "-fx-background-color: " + bgColor + ";" +
-                    "-fx-background-radius: 5;"
-                );
+                // 상한가/하한가 뱃지
+                if (upperLimit) {
+                    changeLabel.setText(String.format("+%.2f%% ▲상한가", changePct));
+                    changeLabel.setStyle(
+                        "-fx-text-fill: #FF4040;" +
+                        "-fx-font-family: 'SUIT';" +
+                        "-fx-font-weight: bold;" +
+                        "-fx-font-size: 10px;" +
+                        "-fx-padding: 2 6 2 6;" +
+                        "-fx-background-color: rgba(255,50,50,0.25);" +
+                        "-fx-background-radius: 5;" +
+                        "-fx-border-color: rgba(255,80,80,0.55);" +
+                        "-fx-border-radius: 5;" +
+                        "-fx-border-width: 1;"
+                    );
+                } else if (lowerLimit) {
+                    changeLabel.setText(String.format("%.2f%% ▼하한가", changePct));
+                    changeLabel.setStyle(
+                        "-fx-text-fill: #4A9EFF;" +
+                        "-fx-font-family: 'SUIT';" +
+                        "-fx-font-weight: bold;" +
+                        "-fx-font-size: 10px;" +
+                        "-fx-padding: 2 6 2 6;" +
+                        "-fx-background-color: rgba(50,100,255,0.25);" +
+                        "-fx-background-radius: 5;" +
+                        "-fx-border-color: rgba(80,130,255,0.55);" +
+                        "-fx-border-radius: 5;" +
+                        "-fx-border-width: 1;"
+                    );
+                } else {
+                    String sign = bull ? "+" : "";
+                    String bgColor = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
+                    changeLabel.setText(String.format("%s%.2f%%", sign, changePct));
+                    changeLabel.setStyle(
+                        "-fx-text-fill: " + colorHex + ";" +
+                        "-fx-font-family: 'SUIT';" +
+                        "-fx-font-weight: bold;" +
+                        "-fx-font-size: 11px;" +
+                        "-fx-padding: 2 6 2 6;" +
+                        "-fx-background-color: " + bgColor + ";" +
+                        "-fx-background-radius: 5;"
+                    );
+                }
                 break;
             }
         }
