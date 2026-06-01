@@ -15,6 +15,7 @@ import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.Group;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -38,6 +39,7 @@ import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import javafx.scene.input.KeyCode;
 import javafx.scene.image.Image;
+import javafx.scene.transform.Scale;
 import javafx.stage.Screen;
 import javafx.geometry.Rectangle2D;
 
@@ -45,12 +47,18 @@ public class Main extends Application {
 
 	private MediaPlayer bgmPlayer;
 
+	private static final double BASE_W = 1920;
+	private static final double BASE_H = 1080;
+
 	private static final double CHART_H = 620;
 	private static final double BOTTOM_H = 260;
 	private static final double GAP = 18;
 	private static final double COLUMN_H = CHART_H + GAP + BOTTOM_H;
 
 	private StackPane appRoot;
+	private Pane responsiveRoot;
+	private Group scaledGroup;
+	private Scale uiScale;
 	private Pane zoomLayer;
 	private StockListPanel stockListRef;
 
@@ -122,9 +130,32 @@ public class Main extends Application {
 			zoomLayer.setPickOnBounds(false);
 
 			appRoot = new StackPane(root, zoomLayer);
+			appRoot.setPrefSize(BASE_W, BASE_H);
+			appRoot.setMinSize(BASE_W, BASE_H);
+			appRoot.setMaxSize(BASE_W, BASE_H);
+			root.setPrefSize(BASE_W, BASE_H);
+			zoomLayer.setPrefSize(BASE_W, BASE_H);
 
-			mainScene = new Scene(appRoot, 1920, 1080);
+			scaledGroup = new Group(appRoot);
+			scaledGroup.setManaged(false);
+			uiScale = new Scale(1, 1, 0, 0);
+			scaledGroup.getTransforms().add(uiScale);
+
+			responsiveRoot = new Pane(scaledGroup);
+			responsiveRoot.setStyle(
+				"-fx-background-color: linear-gradient(to right, " +
+					"#06124A 0%, " +
+					"#1A0B5E 45%, " +
+					"#5B006E 75%, " +
+					"#9B005C 100%);"
+			);
+
+			Rectangle2D visualBounds = Screen.getPrimary().getVisualBounds();
+			mainScene = new Scene(responsiveRoot, visualBounds.getWidth(), visualBounds.getHeight());
 			mainScene.getStylesheets().add(getClass().getResource("application.css").toExternalForm());
+
+			responsiveRoot.widthProperty().addListener((obs, oldVal, newVal) -> updateResponsiveScale());
+			responsiveRoot.heightProperty().addListener((obs, oldVal, newVal) -> updateResponsiveScale());
 
 			mainScene.setOnKeyPressed(e -> {
 				if (e.isAltDown() && e.getCode() == KeyCode.ENTER) {
@@ -539,7 +570,31 @@ public class Main extends Application {
 
 	    optionStage.setScene(scene);
 	    optionStage.show();
+	    
 	}
+	private void updateResponsiveScale() {
+		if (responsiveRoot == null || scaledGroup == null || uiScale == null) return;
+
+		double w = responsiveRoot.getWidth();
+		double h = responsiveRoot.getHeight();
+
+		if (w <= 0 || h <= 0) return;
+
+		// 1920x1080 기준으로 만든 UI를 현재 화면 안에 반드시 들어오도록 축소/확대한다.
+		// 핵심: Scale의 pivot을 (0,0)으로 고정해야 아래로 밀리거나 클릭 위치가 어긋나지 않는다.
+		double scale = Math.min(w / BASE_W, h / BASE_H);
+
+		uiScale.setX(scale);
+		uiScale.setY(scale);
+
+		double scaledW = BASE_W * scale;
+		double scaledH = BASE_H * scale;
+
+		// 남는 공간은 중앙 정렬한다. 화면 비율이 달라도 UI가 잘리지 않는다.
+		scaledGroup.setLayoutX(Math.max(0, (w - scaledW) / 2.0));
+		scaledGroup.setLayoutY(Math.max(0, (h - scaledH) / 2.0));
+	}
+
 	private void toggleDisplayMode() {
 		if (currentMode == DisplayMode.WINDOWED) {
 			applyDisplayMode(DisplayMode.BORDERLESS);
@@ -553,6 +608,7 @@ public class Main extends Application {
 
 		Screen targetScreen = getCurrentScreen(oldStage);
 		Rectangle2D bounds = targetScreen.getBounds();
+		Rectangle2D visualBounds = targetScreen.getVisualBounds();
 
 		Stage newStage = new Stage();
 
@@ -577,8 +633,11 @@ public class Main extends Application {
 		if (mode == DisplayMode.FULLSCREEN) {
 			newStage.setX(bounds.getMinX());
 			newStage.setY(bounds.getMinY());
+			newStage.setWidth(bounds.getWidth());
+			newStage.setHeight(bounds.getHeight());
 			newStage.show();
 			newStage.setFullScreen(true);
+			Platform.runLater(() -> updateResponsiveScale());
 		}
 		else if (mode == DisplayMode.BORDERLESS) {
 			newStage.setX(bounds.getMinX());
@@ -586,18 +645,28 @@ public class Main extends Application {
 			newStage.setWidth(bounds.getWidth());
 			newStage.setHeight(bounds.getHeight());
 			newStage.show();
+			Platform.runLater(() -> updateResponsiveScale());
 		}
 		else if (mode == DisplayMode.WINDOWED) {
-			newStage.setWidth(1920);
-			newStage.setHeight(1080);
+			double winW = Math.min(1280, visualBounds.getWidth() * 0.9);
+			double winH = Math.min(720, visualBounds.getHeight() * 0.9);
 
-			double x = bounds.getMinX() + (bounds.getWidth() - 1920) / 2;
-			double y = bounds.getMinY() + (bounds.getHeight() - 1080) / 2;
+			newStage.setWidth(winW);
+			newStage.setHeight(winH);
+
+			double x = visualBounds.getMinX() + (visualBounds.getWidth() - winW) / 2;
+			double y = visualBounds.getMinY() + (visualBounds.getHeight() - winH) / 2;
 
 			newStage.setX(x);
 			newStage.setY(y);
 
 			newStage.show();
+			newStage.setAlwaysOnTop(true);
+
+			Platform.runLater(() -> {
+			    newStage.setAlwaysOnTop(false);
+			    updateResponsiveScale();
+			});
 		}
 	}
 	private Screen getCurrentScreen(Stage stage) {
@@ -609,7 +678,7 @@ public class Main extends Application {
 		double centerY = stage.getY() + stage.getHeight() / 2;
 
 		for (Screen screen : Screen.getScreens()) {
-			Rectangle2D bounds = screen.getBounds();
+		    Rectangle2D bounds = screen.getBounds();
 
 			if (centerX >= bounds.getMinX() &&
 				centerX <= bounds.getMaxX() &&

@@ -57,18 +57,19 @@ public class StockListPanel extends VBox {
         setSpacing(14);
 
         Label header = new Label("📈 주식 목록");
-        header.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 17));
+        header.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 20));
         header.setTextFill(Color.web("#FFFFFF"));
 
         Label nameCol = new Label("종목명");
-        nameCol.setFont(Font.font("SUIT", FontWeight.BOLD, 12));
+        nameCol.setFont(Font.font("SUIT", FontWeight.BOLD, 14));
+ 
         nameCol.setTextFill(Color.web("#AAB4D4"));
 
         Region headSpacer = new Region();
         HBox.setHgrow(headSpacer, Priority.ALWAYS);
 
         Label priceCol = new Label("현재가");
-        priceCol.setFont(Font.font("SUIT", FontWeight.BOLD, 12));
+        priceCol.setFont(Font.font("SUIT", FontWeight.BOLD, 14));
         priceCol.setTextFill(Color.web("#AAB4D4"));
 
         HBox colHeader = new HBox(8, nameCol, headSpacer, priceCol);
@@ -241,7 +242,7 @@ public class StockListPanel extends VBox {
                         "-fx-text-fill: " + colorHex + ";" +
                         "-fx-font-family: 'SUIT';" +
                         "-fx-font-weight: bold;" +
-                        "-fx-font-size: 11px;" +
+                        "-fx-font-size: 13px;" +
                         "-fx-padding: 2 6 2 6;" +
                         "-fx-background-color: " + bgColor + ";" +
                         "-fx-background-radius: 5;"
@@ -255,14 +256,14 @@ public class StockListPanel extends VBox {
     private HBox buildStockRow(String name, long price) {
         Color trendColor = getTrendColor(name, price);
 
-        Circle trendDot = new Circle(5);
+        Circle trendDot = new Circle(6);
         trendDot.setFill(trendColor);
         trendDot.setStroke(Color.web("#FFFFFF", 0.35));
         trendDot.setStrokeWidth(1);
         trendDot.setEffect(new DropShadow(8, trendColor));
 
         Label nameLabel = new Label(name);
-        nameLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 14));
+        nameLabel.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 16));
         nameLabel.setTextFill(Color.web("#E0E8FF"));
 
         Region spacer = new Region();
@@ -273,7 +274,7 @@ public class StockListPanel extends VBox {
         String bgColor  = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
 
         Label priceLabel = new Label(formatMoney(price) + " 원");
-        priceLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 14));
+        priceLabel.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 16));
         priceLabel.setTextFill(Color.web(colorHex));
 
         Label changeLabel = new Label("+0.00%");
@@ -292,7 +293,7 @@ public class StockListPanel extends VBox {
 
         HBox row = new HBox(8, trendDot, nameLabel, spacer, rightBox);
         row.setAlignment(Pos.CENTER_LEFT);
-        row.setPadding(new Insets(10, 12, 10, 12));
+        row.setPadding(new Insets(12, 14, 12, 14));
         row.setUserData(name);
         applyRowStyle(row, false);
 
