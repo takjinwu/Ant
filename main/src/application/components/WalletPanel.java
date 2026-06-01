@@ -16,6 +16,7 @@ import java.text.NumberFormat;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * WalletPanel
@@ -37,6 +38,9 @@ public class WalletPanel extends VBox {
     private final Label cashValueLabel;
     private final VBox  stockListBox;
 
+    // 보유 주식 클릭 콜백 (종목명 전달)
+    private Consumer<String> onHoldingSelected = null;
+
     // ── 생성자 ─────────────────────────────────────────────
     public WalletPanel(double width, double height) {
         setPrefSize(width, height);
@@ -56,16 +60,16 @@ public class WalletPanel extends VBox {
 
         // ── 헤더 ──
         Label header = new Label("💼  내 지갑");
-        header.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 17));
+        header.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 17));
         header.setTextFill(Color.web("#FFFFFF"));
 
         // ── 현금 섹션 ──
         Label cashLabel = new Label("보유 현금");
-        cashLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
+        cashLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
         cashLabel.setTextFill(Color.web("#AAB4D4"));
 
         cashValueLabel = new Label(formatMoney(cash) + " 원");
-        cashValueLabel.setFont(Font.font("System", FontWeight.EXTRA_BOLD, 22));
+        cashValueLabel.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 22));
         cashValueLabel.setTextFill(Color.web("#7EDDFF"));
         cashValueLabel.setStyle(
             "-fx-effect: dropshadow(gaussian, rgba(126,221,255,0.45), 10, 0.3, 0, 0);"
@@ -80,7 +84,7 @@ public class WalletPanel extends VBox {
 
         // ── 보유 주식 섹션 ──
         Label stockHeader = new Label("보유 주식");
-        stockHeader.setFont(Font.font("System", FontWeight.BOLD, 13));
+        stockHeader.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
         stockHeader.setTextFill(Color.web("#AAB4D4"));
 
         stockListBox = new VBox(6);
@@ -88,7 +92,7 @@ public class WalletPanel extends VBox {
 
         // 빈 안내 문구
         Label empty = new Label("보유 주식이 없습니다.");
-        empty.setFont(Font.font("System", 13));
+        empty.setFont(Font.font("SUIT", 13));
         empty.setTextFill(Color.web("#667799"));
         stockListBox.getChildren().add(empty);
 
@@ -160,6 +164,24 @@ public class WalletPanel extends VBox {
         return true;
     }
 
+    /** 보유 주식 행 클릭 시 호출될 리스너 등록 */
+    public void setOnHoldingSelected(Consumer<String> listener) {
+        this.onHoldingSelected = listener;
+    }
+
+    /**
+     * 상장폐지 처리 — 보유 중인 해당 종목을 강제 제거합니다 (현금 환급 없음).
+     * @return 소각된 평가금액 (보유수량 × 평균단가). 보유 없으면 0.
+     */
+    public long delistStock(String stockName) {
+        if (!holdings.containsKey(stockName)) return 0L;
+        int[] info = holdings.get(stockName);
+        long lostValue = (long) info[0] * info[1];
+        holdings.remove(stockName);
+        refresh();
+        return lostValue;
+    }
+
     /** 특정 종목 보유 수량 반환 (없으면 0) */
     public int getQuantity(String stockName) {
         int[] info = holdings.get(stockName);
@@ -174,7 +196,7 @@ public class WalletPanel extends VBox {
 
         if (holdings.isEmpty()) {
             Label empty = new Label("보유 주식이 없습니다.");
-            empty.setFont(Font.font("System", 13));
+            empty.setFont(Font.font("SUIT", 13));
             empty.setTextFill(Color.web("#667799"));
             stockListBox.getChildren().add(empty);
             return;
@@ -187,18 +209,18 @@ public class WalletPanel extends VBox {
 
     private HBox buildStockRow(String name, int[] info) {
         Label nameLabel = new Label(name);
-        nameLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
+        nameLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
         nameLabel.setTextFill(Color.web("#E0E8FF"));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         Label qtyLabel = new Label(info[0] + "주");
-        qtyLabel.setFont(Font.font("System", FontWeight.BOLD, 13));
+        qtyLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
         qtyLabel.setTextFill(Color.web("#FFD580"));
 
         Label avgLabel = new Label("평균 " + formatMoney(info[1]) + "원");
-        avgLabel.setFont(Font.font("System", 12));
+        avgLabel.setFont(Font.font("SUIT", 12));
         avgLabel.setTextFill(Color.web("#8899BB"));
 
         VBox rightBox = new VBox(2, qtyLabel, avgLabel);
@@ -209,8 +231,29 @@ public class WalletPanel extends VBox {
         row.setPadding(new Insets(8, 12, 8, 12));
         row.setStyle(
             "-fx-background-color: rgba(255,255,255,0.06);" +
-            "-fx-background-radius: 12;"
+            "-fx-background-radius: 12;" +
+            "-fx-cursor: hand;"
         );
+
+        row.setOnMouseEntered(e -> row.setStyle(
+            "-fx-background-color: rgba(231,76,60,0.16);" +
+            "-fx-background-radius: 12;" +
+            "-fx-border-color: rgba(231,76,60,0.45);" +
+            "-fx-border-radius: 12;" +
+            "-fx-cursor: hand;"
+        ));
+
+        row.setOnMouseExited(e -> row.setStyle(
+            "-fx-background-color: rgba(255,255,255,0.06);" +
+            "-fx-background-radius: 12;" +
+            "-fx-cursor: hand;"
+        ));
+
+        row.setOnMouseClicked(e -> {
+            if (onHoldingSelected != null) {
+                onHoldingSelected.accept(name);
+            }
+        });
 
         return row;
     }

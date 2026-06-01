@@ -17,9 +17,9 @@ import javafx.util.Duration;
 
 public class NewsPanel extends Pane {
 
-	private static final String FONT = "맑은 고딕";
+	private static final String FONT = "SUIT";
 
-	private final PanelCard card;
+	private final javafx.scene.layout.StackPane card;
 	private final Label timeLabel;
 	private final Label turnLabel;
 	private final Label titleLabel;
@@ -84,10 +84,10 @@ public class NewsPanel extends Pane {
 	};
 
 	private final int[] crisisEffects = {
-			-9,
-			-8,
-			-10,
-			-7
+			-90,
+			-70,
+			-40,
+			-23
 	};
 
 	// 나중에 사진 넣을 때 여기 경로만 바꾸면 됨
@@ -110,7 +110,10 @@ public class NewsPanel extends Pane {
 	public NewsPanel(double width, double height) {
 		setPrefSize(width, height);
 
-		card = new PanelCard("", 32, FontWeight.BOLD, width, height) {};
+		card = new javafx.scene.layout.StackPane();
+		card.getStyleClass().add("panel");
+		card.setPrefSize(width, height);
+		card.setMaxHeight(height);
 
 		timeLabel = new Label("00:00");
 		timeLabel.setFont(Font.font(FONT, FontWeight.BOLD, 18));
@@ -203,7 +206,7 @@ public class NewsPanel extends Pane {
 
 	private void startNewsTimer() {
 		newsTimer = new Timeline(
-				new KeyFrame(Duration.minutes(3), e -> nextTurn())
+				new KeyFrame(Duration.minutes(1), e -> nextTurn())
 		);
 
 		newsTimer.setCycleCount(Timeline.INDEFINITE);
