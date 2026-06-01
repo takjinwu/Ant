@@ -275,7 +275,7 @@ public class Main extends Application {
 
 	private void showStartNotice(NewsPanel newsPanel) {
 		Label notice = new Label("10초 후 시작됩니다");
-		Button skipButton = new Button("스킵");
+		Button skipButton = new Button("SKIP ▶▶");
 
 		notice.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 34));
 		notice.setTextFill(Color.WHITE);
@@ -395,7 +395,7 @@ public class Main extends Application {
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 
-		Button fastForward = new Button("▶▶");
+		Button fastForward = new Button("SKIP ▶▶");
 		fastForward.setStyle(topButtonStyle());
 		fastForward.setOnAction(e -> newsPanel.nextTurn());
 

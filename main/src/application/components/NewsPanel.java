@@ -61,12 +61,14 @@ public class NewsPanel extends Pane {
 	};
 
 	private final int[] normalEffects = {
+			70,
+			23,
+			20,
+			30,
+			80,
 			7,
-			9,
-			10,
-			3,
-			8,
-			1
+			7,
+			7
 	};
 
 	private final String[] crisisNewsTitles = {
