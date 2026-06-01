@@ -192,7 +192,7 @@ public class Main extends Application {
 			Media bgm = new Media(bgmUrl.toExternalForm());
 			bgmPlayer = new MediaPlayer(bgm);
 			bgmPlayer.setCycleCount(MediaPlayer.INDEFINITE);
-			bgmPlayer.setVolume(0.3);
+			bgmPlayer.setVolume(0.1);
 			bgmPlayer.play();
 
 		} catch (Exception e) {
