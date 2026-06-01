@@ -61,6 +61,7 @@ public class Main extends Application {
 	private Scale uiScale;
 	private Pane zoomLayer;
 	private StockListPanel stockListRef;
+	private OrderPanel orderRef;
 
 	private String uiFontFamily = Font.getDefault().getFamily();
 
@@ -113,6 +114,10 @@ public class Main extends Application {
 				if (stockListRef != null) {
 					chartPanel.addCandleToAll(stockListRef.getStocks(), effect);
 					stockListRef.updateAllPrices(chartPanel);
+					// 턴 변경 후 OrderPanel에 선택된 종목의 현재가 갱신
+					if (orderRef != null) {
+						orderRef.refreshPrice(stockListRef);
+					}
 				} else {
 					chartPanel.addCandle(effect);
 				}
@@ -692,6 +697,7 @@ public class Main extends Application {
 	}
 	private HBox buildCenter(NewsPanel newsPanel, ChartPanel chartPanel) {
 		OrderPanel order = new OrderPanel(370, BOTTOM_H);
+		orderRef = order;
 		WalletPanel wallet = new WalletPanel(370, BOTTOM_H);
 		StockListPanel stockList = new StockListPanel(520, COLUMN_H);
 		stockListRef = stockList;
@@ -712,6 +718,7 @@ public class Main extends Application {
 
 		stockList.setOnStockSelected((name, price) -> {
 			order.setSelectedStock(name, price);
+			order.updatePrice(price);
 			chartPanel.showStock(name, price);
 		});
 
