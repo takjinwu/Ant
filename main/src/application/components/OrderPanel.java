@@ -269,7 +269,7 @@ public class OrderPanel extends VBox {
                 setFeedback("✅ " + selectedStock + " " + qty + "주 매수 완료!", true);
                 showToast(true, selectedStock, qty);
             } else {
-                setFeedback("❌ 잔액이 부족합니다.", false);
+                setFeedback("❌ 잔액이 부족합니다.", false); return;
             }
         } else {
             boolean ok = wallet.sell(selectedStock, qty, currentPrice);
@@ -283,7 +283,7 @@ public class OrderPanel extends VBox {
                 currentPrice = 0L;
             } else {
                 int held = wallet.getQuantity(selectedStock);
-                setFeedback("❌ 보유 수량 부족 (보유: " + held + "주)", false);
+                setFeedback("❌ 보유 수량 부족 (보유: " + held + "주)", false); return;
             }
         }
 
