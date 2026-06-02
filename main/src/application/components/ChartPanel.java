@@ -9,10 +9,13 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.ScrollEvent;
+import javafx.scene.Cursor;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.scene.text.TextAlignment;
 
 import java.util.Arrays;
 
@@ -29,9 +32,9 @@ import java.util.Arrays;
  */
 public class ChartPanel extends VBox {
 
-    private static final int AXIS_W = 72;
+    private static final int AXIS_W = 86;
     private static final int PAD_L = 10;
-    private static final int PAD_R = 4;
+    private static final int PAD_R = 6;
     private static final double VOL_RATIO = 0.22;
     private static final double HEAD_H = 72;
     private static final int VISIBLE_CANDLES = 30;  // 화면에 표시할 최대 캔들 수
@@ -80,6 +83,9 @@ public class ChartPanel extends VBox {
     private Label tooltipBox;
     private boolean showCandle = true;
     private double mouseX = -1, mouseY = -1;
+    private int    scrollOffset   = 0;   // 0=최신, 양수=과거로 이동
+    private double dragStartX     = -1;
+    private int    dragStartOffset = 0;
 
     public ChartPanel(double width, double height) {
         this.panelW = width;
@@ -192,7 +198,7 @@ public class ChartPanel extends VBox {
     }
 
     private StackPane buildCandlePane() {
-        candleCanvas = new Canvas(panelW, candleH);
+        candleCanvas = new Canvas(panelW - 4, candleH);
 
         tooltipBox = new Label();
         tooltipBox.setVisible(false);
@@ -209,6 +215,7 @@ public class ChartPanel extends VBox {
         );
 
         StackPane pane = new StackPane(candleCanvas, tooltipBox);
+        candleCanvas.setCursor(Cursor.DEFAULT);
         StackPane.setAlignment(tooltipBox, Pos.TOP_LEFT);
 
         candleCanvas.addEventHandler(MouseEvent.MOUSE_MOVED, e -> {
@@ -226,6 +233,34 @@ public class ChartPanel extends VBox {
             redraw();
         });
 
+        // ── 마우스 드래그: 오른쪽→과거, 왼쪽→최신 (자연스러운 차트 패닝) ──
+        candleCanvas.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
+            dragStartX      = e.getX();
+            dragStartOffset = scrollOffset;
+        });
+        candleCanvas.addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> {
+            if (dragStartX < 0) return;
+            double cw2    = candleCanvas.getWidth();
+            int    visN   = Math.min(VISIBLE_CANDLES, data.length);
+            double barW2  = (cw2 - AXIS_W - PAD_L - PAD_R) / visN;
+            // dragStartX - e.getX() : 오른쪽으로 드래그하면 음수 → offset 감소(최신)
+            // 부호 반전: 오른쪽 드래그 → offset 증가(과거)
+            int steps = (int) ((e.getX() - dragStartX) / barW2);
+            int maxOff = Math.max(0, data.length - VISIBLE_CANDLES);
+            scrollOffset = Math.max(0, Math.min(maxOff, dragStartOffset + steps));
+            redraw();
+        });
+        candleCanvas.addEventHandler(MouseEvent.MOUSE_RELEASED, e -> { dragStartX = -1; candleCanvas.setCursor(Cursor.DEFAULT); });
+
+        // ── 스크롤 휠: 위=최신, 아래=과거 ──
+        candleCanvas.addEventHandler(ScrollEvent.SCROLL, e -> {
+            double raw  = e.getDeltaX() != 0 ? e.getDeltaX() : -e.getDeltaY();
+            int    step = raw > 0 ? -3 : 3;  // 휠 위/오른쪽→최신, 아래/왼쪽→과거
+            int maxOff  = Math.max(0, data.length - VISIBLE_CANDLES);
+            scrollOffset = Math.max(0, Math.min(maxOff, scrollOffset + step));
+            redraw();
+        });
+
         return pane;
     }
 
@@ -236,7 +271,7 @@ public class ChartPanel extends VBox {
     }
 
     private StackPane buildVolPane() {
-        volCanvas = new Canvas(panelW, volH);
+        volCanvas = new Canvas(panelW - 4, volH);
 
         volCanvas.addEventHandler(MouseEvent.MOUSE_MOVED, e -> {
             mouseX = e.getX();
@@ -419,6 +454,7 @@ public class ChartPanel extends VBox {
         this.currentStockName = name;
         // 캐시에 없을 때만 새로 생성 — 기존 addCandle 데이터를 보존
         this.data = dataCache.computeIfAbsent(name, k -> generateSeries(k, price));
+        scrollOffset = 0;  // 종목 전환 시 최신 캔들로 복귀
 
         boolean darkText = "카카오".equals(name);
         badge.setText(name);
@@ -612,10 +648,14 @@ public class ChartPanel extends VBox {
         }
     }
 
-    /** 전체 data 중 최근 VISIBLE_CANDLES 개만 반환 (슬라이딩 윈도우) */
+    /** scrollOffset을 반영하여 VISIBLE_CANDLES 개 캔들 반환 */
     private double[][] getVisibleData() {
-        if (data.length <= VISIBLE_CANDLES) return data;
-        return java.util.Arrays.copyOfRange(data, data.length - VISIBLE_CANDLES, data.length);
+        int total  = data.length;
+        int safeOff = Math.max(0, Math.min(scrollOffset, Math.max(0, total - 1)));
+        int end    = total - safeOff;
+        end        = Math.max(Math.min(VISIBLE_CANDLES, total), Math.min(end, total));
+        int start  = Math.max(0, end - VISIBLE_CANDLES);
+        return java.util.Arrays.copyOfRange(data, start, end);
     }
 
     private void redraw() {
@@ -658,12 +698,16 @@ public class ChartPanel extends VBox {
         gc.setFill(Color.web("#8899aa"));
         gc.setStroke(Color.web("#ffffff", 0.07));
         gc.setLineWidth(1);
+        gc.setTextAlign(TextAlignment.RIGHT);   // ← 우측 정렬: 캔버스 끝에서 안쪽으로 그림
         for (int i = 0; i <= 5; i++) {
             double y = ch / 5.0 * i;
             gc.strokeLine(PAD_L, y, cw - AXIS_W, y);
+            double labelY = (i == 5) ? Math.min(y + 4, ch - 2) : y + 4;
+            if (labelY < 10) labelY = 10;
             long labelPrice = Math.round((maxP - (maxP - minP) * i / 5) / 100.0) * 100;
-            gc.fillText(String.format("%,d", labelPrice), cw - AXIS_W + 6, y + 4);
+            gc.fillText(String.format("%,d", labelPrice), cw - 4, labelY);  // x=cw-4: 오른쪽 끝 기준
         }
+        gc.setTextAlign(TextAlignment.LEFT);    // 이후 다른 텍스트 위해 원복
 
         if (showCandle) {
             for (int i = 0; i < n; i++) {
@@ -727,7 +771,9 @@ public class ChartPanel extends VBox {
                 gc.fillRoundRect(cw - AXIS_W, mouseY - 10, AXIS_W - 2, 20, 5, 5);
                 gc.setFill(Color.web("#06124A"));
                 gc.setFont(Font.font("SUIT", FontWeight.BOLD, 10));
-                gc.fillText(String.format("%,d", (long) curPrice), cw - AXIS_W + 4, mouseY + 4);
+                gc.setTextAlign(TextAlignment.RIGHT);
+                gc.fillText(String.format("%,d", (long) curPrice), cw - 4, mouseY + 4);
+                gc.setTextAlign(TextAlignment.LEFT);
             }
             gc.setLineDashes();
         }
@@ -761,8 +807,10 @@ public class ChartPanel extends VBox {
 
         gc.setFill(Color.web("#8899aa"));
         gc.setFont(Font.font("SUIT", 10));
-        gc.fillText(String.format("%,.0f", maxVol), cw - AXIS_W + 4, 12);
-        gc.fillText(String.format("%,.0f", maxVol / 2), cw - AXIS_W + 4, ch / 2 + 4);
+        gc.setTextAlign(TextAlignment.RIGHT);
+        gc.fillText(String.format("%,.0f", maxVol),     cw - 4, 12);
+        gc.fillText(String.format("%,.0f", maxVol / 2), cw - 4, ch / 2 + 4);
+        gc.setTextAlign(TextAlignment.LEFT);
 
         if (mouseX >= 0 && mouseX <= cw - AXIS_W) {
             gc.setStroke(Color.web("#ffffff", 0.28));
