@@ -21,7 +21,7 @@ import java.util.List;
 public class NewsPanel extends Pane {
 	private final List<Integer> usedNews = new ArrayList<>();
 	private static final String FONT = "SUIT";
-	private static final int MAX_TURN = 20;
+	private static final int MAX_TURN = 21;
 	private Runnable gameFinishedHandler;
 	private boolean gameEnded = false;
 	private final javafx.scene.layout.StackPane card;
@@ -161,7 +161,12 @@ public class NewsPanel extends Pane {
 			new NewsItem("국제유가 사상 최고치 돌파",
 					"중동 정세 불안과 공급 차질 우려가 겹치며 국제유가가 사상 최고치를 기록했다. 물가 상승 압력이 커지면서 기업 비용 부담과 소비 위축 우려가 확대되고 있다.",
 					-90,
-					"/Newsimg/p20.png")
+					"/Newsimg/p20.png"),
+			
+			new NewsItem("카이저 컴퍼니 주가조작 의혹",
+					"금융당국이 카이저 컴퍼니의 비정상적인 주가 급등 과정에서 주가조작 정황을 포착하고 본격적인 수사에 나섰다. 허위 호재성 정보 유포와 내부자 거래 의혹이 제기되면서 투자 심리가 급격히 위축되고 있다. 회사 측은 모든 의혹을 부인했지만 시장의 불안은 커지고 있다.",
+					-20,
+					"/Newsimg/p21.png")
 	};
 
 	public NewsPanel(double width, double height) {
@@ -291,7 +296,7 @@ public class NewsPanel extends Pane {
 
 			turnLabel.setText("TURN " + MAX_TURN);
 			titleLabel.setText("게임 종료!");
-			contentLabel.setText("20턴이 종료되었습니다. 최종 결과를 확인하세요.");
+			contentLabel.setText("21턴이 종료되었습니다. 최종 결과를 확인하세요.");
 
 			currentNewsTitle = "게임 종료!";
 			currentEffect = 0;
@@ -299,7 +304,7 @@ public class NewsPanel extends Pane {
 			if (listener != null) {
 				listener.onNewsChanged(
 						currentNewsTitle,
-						"20턴이 종료되었습니다. 최종 결과를 확인하세요.",
+						"21턴이 종료되었습니다. 최종 결과를 확인하세요.",
 						currentEffect,
 						turn
 				);
