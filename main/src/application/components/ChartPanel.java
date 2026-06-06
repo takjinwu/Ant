@@ -382,6 +382,10 @@ public class ChartPanel extends VBox {
             double upperLimit = prevClose * (1 + LIMIT_RATE);
             double lowerLimit = prevClose * (1 - LIMIT_RATE);
             close = Math.max(lowerLimit, Math.min(upperLimit, close));
+         // 카이저 주가조작 뉴스 이후에는 하한가 제한을 무시하고 급락
+            if (name.equals("카이저 컴퍼니") && effect <= -9999) {
+                close = prevClose * 0.25;
+            }
             double high  = Math.min(Math.max(open, close) * (1 + r.nextDouble() * 0.015), upperLimit);
             double low   = Math.max(Math.min(open, close) * (1 - r.nextDouble() * 0.015), lowerLimit);
             double vol   = 500_000 + r.nextDouble() * 1_500_000;

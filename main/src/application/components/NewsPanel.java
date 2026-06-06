@@ -388,6 +388,15 @@ public class NewsPanel extends Pane {
 	
 	private NewsItem getRandomNews() {
 
+	    // 10턴에 카이저 주가조작 뉴스 고정
+	    if (turn == 10) {
+	        for (NewsItem item : newsList) {
+	            if (item.title.contains("카이저 컴퍼니 주가조작")) {
+	                return item;
+	            }
+	        }
+	    }
+
 	    if (usedNews.size() >= newsList.length) {
 	        usedNews.clear();
 	    }
@@ -396,7 +405,10 @@ public class NewsPanel extends Pane {
 
 	    do {
 	        index = random.nextInt(newsList.length);
-	    } while (usedNews.contains(index));
+	    } while (
+	        usedNews.contains(index)
+	        || newsList[index].title.contains("카이저 컴퍼니 주가조작")
+	    );
 
 	    usedNews.add(index);
 

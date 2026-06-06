@@ -46,6 +46,7 @@ import javafx.scene.control.Button;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.paint.Color;
 
+
 public class Main extends Application {
 
 	private MediaPlayer bgmPlayer;
@@ -70,7 +71,7 @@ public class Main extends Application {
 	private OrderPanel orderRef;
 
 	private String uiFontFamily = Font.getDefault().getFamily();
-
+	private boolean kaiserCrashStarted = false;
 	private Stage currentStage;
 	private Scene mainScene;
 
@@ -84,6 +85,7 @@ public class Main extends Application {
 
 	@Override
 	public void start(Stage primaryStage) {
+		kaiserCrashStarted = false;
 		try {
 			java.io.InputStream regularStream = getClass().getResourceAsStream("fonts/SUIT-Regular.ttf");
 			java.io.InputStream boldStream = getClass().getResourceAsStream("fonts/SUIT-Bold.ttf");
@@ -115,7 +117,7 @@ public class Main extends Application {
 				System.out.println("내용: " + content);
 				System.out.println("영향: " + effect);
 				System.out.println("턴: " + turn);
-
+				
 				if (stockListRef != null) {
 					// 뉴스가 영향을 주는 섹터별 효과를 종목별 효과로 변환한다.
 					// 같은 뉴스라도 종목의 섹터에 따라 오르거나 내리거나 거의 안 움직인다.
@@ -127,7 +129,30 @@ public class Main extends Application {
 								sector, sectorEffects.getOrDefault("전체", 0));
 						effectByStock.put(name, e);
 					}
+					for (String name : stockListRef.getStocks().keySet()) {
 
+					    if (name.equals("카이저 컴퍼니")) {
+					        continue; // 카이저는 일반 뉴스 영향 안 받게 제외
+					    }
+
+					    String sector = StockListPanel.getSectorOf(name);
+
+					    int e = sectorEffects.getOrDefault(
+					            sector,
+					            sectorEffects.getOrDefault("전체", 0));
+
+					    effectByStock.put(name, e);
+					}
+
+					if (title.contains("카이저 컴퍼니 주가조작")) {
+					    kaiserCrashStarted = true;
+					}
+
+					if (kaiserCrashStarted) {
+					    effectByStock.put("카이저 컴퍼니", -300);
+					} else {
+					    effectByStock.put("카이저 컴퍼니", 150);
+					}
 					chartPanel.addCandleToAll(stockListRef.getStocks(), effectByStock);
 					stockListRef.updateAllPrices(chartPanel);
 					// 턴 변경 후 OrderPanel에 선택된 종목의 현재가 갱신
@@ -239,7 +264,7 @@ public class Main extends Application {
 
 		Label desc = new Label(
 			"뉴스를 확인하고 주식을 매수·매도하여\n" +
-			"20턴 동안 최대한 높은 자산을 만들어보세요.\n\n" +
+			"21턴 동안 최대한 높은 자산을 만들어보세요.\n\n" +
 			"뉴스는 1분마다 자동으로 변경되며,\n" +
 			"SKIP 버튼으로 바로 다음 턴으로 넘길 수 있습니다."
 		);
@@ -296,7 +321,7 @@ public class Main extends Application {
 		title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 50));
 		title.setTextFill(Color.WHITE);
 
-		Label desc = new Label("20턴이 모두 종료되었습니다.\n최종 결과를 확인하거나 다시 도전할 수 있습니다.");
+		Label desc = new Label("21턴이 모두 종료되었습니다.\n최종 결과를 확인하거나 다시 도전할 수 있습니다.");
 		desc.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 21));
 		desc.setTextFill(Color.web("#DDE8FF"));
 		desc.setAlignment(Pos.CENTER);
@@ -415,6 +440,7 @@ public class Main extends Application {
 	}
 
 	private void restartGame() {
+		kaiserCrashStarted = false;
 		if (bgmPlayer != null) {
 			bgmPlayer.stop();
 		}

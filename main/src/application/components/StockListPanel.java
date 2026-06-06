@@ -112,8 +112,9 @@ public class StockListPanel extends VBox {
         CATEGORIES.put("바이오",   new String[]{"셀트리온", "유한양행"});
         CATEGORIES.put("방산",     new String[]{"한화에어로스페이스", "LIG넥스원"});
         CATEGORIES.put("이차전지", new String[]{"LG에너지솔루션", "에코프로비엠"});
-        CATEGORIES.put("IT",       new String[]{"네이버", "카카오"});
+        CATEGORIES.put("IT",       new String[]{"네이버", "카카오", "카이저 컴퍼니"});
         CATEGORIES.put("자동차",   new String[]{"현대차", "기아"});
+        
     }
 
     /** 종목명 → 업종(섹터) 역매핑 (뉴스의 섹터별 영향을 종목에 매핑할 때 사용) */
@@ -142,6 +143,7 @@ public class StockListPanel extends VBox {
         stocks.put("에코프로비엠", 180_000L);
         stocks.put("네이버", 210_000L);
         stocks.put("카카오", 42_000L);
+        stocks.put("카이저 컴퍼니", 15000L);
         stocks.put("현대차", 250_000L);
         stocks.put("기아", 105_000L);
     }
