@@ -116,6 +116,21 @@ public class StockListPanel extends VBox {
         CATEGORIES.put("자동차",   new String[]{"현대차", "기아"});
     }
 
+    /** 종목명 → 업종(섹터) 역매핑 (뉴스의 섹터별 영향을 종목에 매핑할 때 사용) */
+    private static final Map<String, String> STOCK_SECTOR = new LinkedHashMap<>();
+    static {
+        for (Map.Entry<String, String[]> e : CATEGORIES.entrySet()) {
+            for (String name : e.getValue()) {
+                STOCK_SECTOR.put(name, e.getKey());
+            }
+        }
+    }
+
+    /** 해당 종목의 업종(섹터)을 반환한다. 미분류 종목은 "전체"로 간주. */
+    public static String getSectorOf(String stockName) {
+        return STOCK_SECTOR.getOrDefault(stockName, "전체");
+    }
+
     private void registerDefaultStocks() {
         stocks.put("삼성전자", 75_000L);
         stocks.put("SK하이닉스", 180_000L);

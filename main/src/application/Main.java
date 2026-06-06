@@ -114,7 +114,18 @@ public class Main extends Application {
 				System.out.println("턴: " + turn);
 
 				if (stockListRef != null) {
-					chartPanel.addCandleToAll(stockListRef.getStocks(), effect);
+					// 뉴스가 영향을 주는 섹터별 효과를 종목별 효과로 변환한다.
+					// 같은 뉴스라도 종목의 섹터에 따라 오르거나 내리거나 거의 안 움직인다.
+					java.util.Map<String, Integer> sectorEffects = newsPanel.getCurrentSectorEffects();
+					java.util.Map<String, Integer> effectByStock = new java.util.HashMap<>();
+					for (String name : stockListRef.getStocks().keySet()) {
+						String sector = StockListPanel.getSectorOf(name);
+						int e = sectorEffects.getOrDefault(
+								sector, sectorEffects.getOrDefault("전체", 0));
+						effectByStock.put(name, e);
+					}
+
+					chartPanel.addCandleToAll(stockListRef.getStocks(), effectByStock);
 					stockListRef.updateAllPrices(chartPanel);
 					// 턴 변경 후 OrderPanel에 선택된 종목의 현재가 갱신
 					if (orderRef != null) {
