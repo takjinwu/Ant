@@ -79,8 +79,15 @@ public class StockListPanel extends VBox {
         registerDefaultStocks();
 
         rowBox = new VBox(6);
-        for (Map.Entry<String, Long> e : stocks.entrySet()) {
-            rowBox.getChildren().add(buildStockRow(e.getKey(), e.getValue()));
+        // 업종(섹터)별로 카테고리 헤더를 넣고 그 아래에 해당 종목 행을 추가한다.
+        for (Map.Entry<String, String[]> cat : CATEGORIES.entrySet()) {
+            rowBox.getChildren().add(buildCategoryHeader(cat.getKey()));
+            for (String stockName : cat.getValue()) {
+                Long price = stocks.get(stockName);
+                if (price != null) {
+                    rowBox.getChildren().add(buildStockRow(stockName, price));
+                }
+            }
         }
 
         ScrollPane scroll = new ScrollPane(rowBox);
@@ -98,6 +105,17 @@ public class StockListPanel extends VBox {
         getChildren().addAll(header, colHeader, scroll);
     }
 
+    /** 업종(섹터) → 소속 종목명 (목록 표시 순서이자 그룹 정의) */
+    private static final Map<String, String[]> CATEGORIES = new LinkedHashMap<>();
+    static {
+        CATEGORIES.put("반도체",   new String[]{"삼성전자", "SK하이닉스"});
+        CATEGORIES.put("바이오",   new String[]{"셀트리온", "유한양행"});
+        CATEGORIES.put("방산",     new String[]{"한화에어로스페이스", "LIG넥스원"});
+        CATEGORIES.put("이차전지", new String[]{"LG에너지솔루션", "에코프로비엠"});
+        CATEGORIES.put("IT",       new String[]{"네이버", "카카오"});
+        CATEGORIES.put("자동차",   new String[]{"현대차", "기아"});
+    }
+
     private void registerDefaultStocks() {
         stocks.put("삼성전자", 75_000L);
         stocks.put("SK하이닉스", 180_000L);
@@ -111,6 +129,15 @@ public class StockListPanel extends VBox {
         stocks.put("카카오", 42_000L);
         stocks.put("현대차", 250_000L);
         stocks.put("기아", 105_000L);
+    }
+
+    /** 업종 구분용 소제목(헤더) 라벨을 생성한다. (HBox 가 아니므로 가격/상폐 갱신 루프에 영향 없음) */
+    private Label buildCategoryHeader(String title) {
+        Label cat = new Label(title);
+        cat.setStyle("-fx-font-family: 'SUIT'; -fx-font-weight: bold; -fx-font-size: 12px;");
+        cat.setTextFill(Color.web("#8A93B2"));
+        cat.setPadding(new Insets(8, 4, 0, 4));
+        return cat;
     }
 
     /** ChartPanel 참조를 설정합니다. 설정 후 동그라미 색상이 실제 차트 데이터와 동기화됩니다. */
@@ -443,12 +470,15 @@ public class StockListPanel extends VBox {
      * 앱 시작 시 ChartPanel과 초기 상태를 동기화하기 위해 Main.java에서 호출됩니다.
      */
     public void selectFirst() {
-        if (rowBox.getChildren().isEmpty()) return;
-        if (rowBox.getChildren().get(0) instanceof HBox row) {
-            String name = (String) row.getUserData();
-            Long price = stocks.get(name);
-            if (price != null) {
-                selectRow(row, name, price);
+        // 첫 자식은 카테고리 헤더(Label)일 수 있으므로 첫 번째 HBox(종목 행)를 찾는다.
+        for (var node : rowBox.getChildren()) {
+            if (node instanceof HBox row) {
+                String name = (String) row.getUserData();
+                Long price = stocks.get(name);
+                if (price != null) {
+                    selectRow(row, name, price);
+                }
+                return;
             }
         }
     }
