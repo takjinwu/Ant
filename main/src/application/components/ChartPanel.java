@@ -9,10 +9,13 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.ToggleButton;
 import javafx.scene.control.ToggleGroup;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.input.ScrollEvent;
+import javafx.scene.Cursor;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.scene.text.TextAlignment;
 
 import java.util.Arrays;
 
@@ -29,12 +32,13 @@ import java.util.Arrays;
  */
 public class ChartPanel extends VBox {
 
-    private static final int AXIS_W = 72;
+    private static final int AXIS_W = 86;
     private static final int PAD_L = 10;
-    private static final int PAD_R = 4;
+    private static final int PAD_R = 6;
     private static final double VOL_RATIO = 0.22;
     private static final double HEAD_H = 72;
     private static final int VISIBLE_CANDLES = 30;  // 화면에 표시할 최대 캔들 수
+    private static final double LIMIT_RATE = 0.30;  // 상한가/하한가 ±30%
 
     private static final double[][] SAMPLE_SERIES = {
         {60000, 65000, 58000, 62000, 900000},
@@ -63,6 +67,7 @@ public class ChartPanel extends VBox {
 
     // ── 종목별 데이터 캐시 (버그 수정: 탭 전환 시 addCandle 데이터 유지) ──
     private final java.util.HashMap<String, double[][]> dataCache = new java.util.HashMap<>();
+    private final java.util.Set<String> delistedStocks = new java.util.HashSet<>();  // 상장폐지 종목
     private String currentStockName = "";
 
     private final double panelW;
@@ -74,9 +79,13 @@ public class ChartPanel extends VBox {
     private Label badge;
     private Label nameLabel;
     private Label priceLabel;
+    private Label changeLabel;   // 등락률 표시 레이블
     private Label tooltipBox;
     private boolean showCandle = true;
     private double mouseX = -1, mouseY = -1;
+    private int    scrollOffset   = 0;   // 0=최신, 양수=과거로 이동
+    private double dragStartX     = -1;
+    private int    dragStartOffset = 0;
 
     public ChartPanel(double width, double height) {
         this.panelW = width;
@@ -135,7 +144,21 @@ public class ChartPanel extends VBox {
             "-fx-font-size: 24px;"
         );
 
-        VBox namePrice = new VBox(2, nameLabel, priceLabel);
+        changeLabel = new Label("+0.00%");
+        changeLabel.setStyle(
+            "-fx-text-fill: #ff6b6b;" +
+            "-fx-font-family: 'SUIT';" +
+            "-fx-font-weight: bold;" +
+            "-fx-font-size: 15px;" +
+            "-fx-padding: 4 8 4 8;" +
+            "-fx-background-color: rgba(232,83,74,0.15);" +
+            "-fx-background-radius: 6;"
+        );
+
+        HBox priceRow = new HBox(10, priceLabel, changeLabel);
+        priceRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox namePrice = new VBox(2, nameLabel, priceRow);
         namePrice.setAlignment(Pos.CENTER_LEFT);
 
         Region spacer = new Region();
@@ -175,7 +198,7 @@ public class ChartPanel extends VBox {
     }
 
     private StackPane buildCandlePane() {
-        candleCanvas = new Canvas(panelW, candleH);
+        candleCanvas = new Canvas(panelW - 4, candleH);
 
         tooltipBox = new Label();
         tooltipBox.setVisible(false);
@@ -192,6 +215,7 @@ public class ChartPanel extends VBox {
         );
 
         StackPane pane = new StackPane(candleCanvas, tooltipBox);
+        candleCanvas.setCursor(Cursor.DEFAULT);
         StackPane.setAlignment(tooltipBox, Pos.TOP_LEFT);
 
         candleCanvas.addEventHandler(MouseEvent.MOUSE_MOVED, e -> {
@@ -209,6 +233,34 @@ public class ChartPanel extends VBox {
             redraw();
         });
 
+        // ── 마우스 드래그: 오른쪽→과거, 왼쪽→최신 (자연스러운 차트 패닝) ──
+        candleCanvas.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
+            dragStartX      = e.getX();
+            dragStartOffset = scrollOffset;
+        });
+        candleCanvas.addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> {
+            if (dragStartX < 0) return;
+            double cw2    = candleCanvas.getWidth();
+            int    visN   = Math.min(VISIBLE_CANDLES, data.length);
+            double barW2  = (cw2 - AXIS_W - PAD_L - PAD_R) / visN;
+            // dragStartX - e.getX() : 오른쪽으로 드래그하면 음수 → offset 감소(최신)
+            // 부호 반전: 오른쪽 드래그 → offset 증가(과거)
+            int steps = (int) ((e.getX() - dragStartX) / barW2);
+            int maxOff = Math.max(0, data.length - VISIBLE_CANDLES);
+            scrollOffset = Math.max(0, Math.min(maxOff, dragStartOffset + steps));
+            redraw();
+        });
+        candleCanvas.addEventHandler(MouseEvent.MOUSE_RELEASED, e -> { dragStartX = -1; candleCanvas.setCursor(Cursor.DEFAULT); });
+
+        // ── 스크롤 휠: 위=최신, 아래=과거 ──
+        candleCanvas.addEventHandler(ScrollEvent.SCROLL, e -> {
+            double raw  = e.getDeltaX() != 0 ? e.getDeltaX() : -e.getDeltaY();
+            int    step = raw > 0 ? -3 : 3;  // 휠 위/오른쪽→최신, 아래/왼쪽→과거
+            int maxOff  = Math.max(0, data.length - VISIBLE_CANDLES);
+            scrollOffset = Math.max(0, Math.min(maxOff, scrollOffset + step));
+            redraw();
+        });
+
         return pane;
     }
 
@@ -219,7 +271,7 @@ public class ChartPanel extends VBox {
     }
 
     private StackPane buildVolPane() {
-        volCanvas = new Canvas(panelW, volH);
+        volCanvas = new Canvas(panelW - 4, volH);
 
         volCanvas.addEventHandler(MouseEvent.MOUSE_MOVED, e -> {
             mouseX = e.getX();
@@ -256,8 +308,13 @@ public class ChartPanel extends VBox {
         double drift  = bias + (r.nextDouble() - 0.5) * 0.04;   // 랜덤 노이즈 ±2%
         double open   = prevClose;
         double close  = open * (1 + drift);
-        double high   = Math.max(open, close) * (1 + r.nextDouble() * 0.015);
-        double low    = Math.min(open, close) * (1 - r.nextDouble() * 0.015);
+
+        // ── 상한가/하한가 ±30% 클램프 (직전 종가 기준) ──
+        double upperLimit = prevClose * (1 + LIMIT_RATE);   // 상한가
+        double lowerLimit = prevClose * (1 - LIMIT_RATE);   // 하한가
+        close = Math.max(lowerLimit, Math.min(upperLimit, close));
+        double high   = Math.min(Math.max(open, close) * (1 + r.nextDouble() * 0.015), upperLimit);
+        double low    = Math.max(Math.min(open, close) * (1 - r.nextDouble() * 0.015), lowerLimit);
         double vol    = 500_000 + r.nextDouble() * 1_500_000;
 
         // 호가단위 반올림
@@ -296,6 +353,9 @@ public class ChartPanel extends VBox {
             String name  = entry.getKey();
             long   price = entry.getValue();
 
+            // ── 상장폐지 종목은 캔들 추가 안 함 ──
+            if (delistedStocks.contains(name)) continue;
+
             // 캐시에 없으면 초기 시리즈 생성
             double[][] stockData = dataCache.computeIfAbsent(name, k -> generateSeries(k, price));
 
@@ -306,8 +366,13 @@ public class ChartPanel extends VBox {
             double drift = bias + (r.nextDouble() - 0.5) * 0.04;
             double open  = prevClose;
             double close = open  * (1 + drift);
-            double high  = Math.max(open, close) * (1 + r.nextDouble() * 0.015);
-            double low   = Math.min(open, close) * (1 - r.nextDouble() * 0.015);
+
+            // ── 상한가/하한가 ±30% 클램프 (직전 종가 기준) ──
+            double upperLimit = prevClose * (1 + LIMIT_RATE);
+            double lowerLimit = prevClose * (1 - LIMIT_RATE);
+            close = Math.max(lowerLimit, Math.min(upperLimit, close));
+            double high  = Math.min(Math.max(open, close) * (1 + r.nextDouble() * 0.015), upperLimit);
+            double low   = Math.max(Math.min(open, close) * (1 - r.nextDouble() * 0.015), lowerLimit);
             double vol   = 500_000 + r.nextDouble() * 1_500_000;
 
             open  = roundToTick(open);
@@ -331,6 +396,18 @@ public class ChartPanel extends VBox {
     }
 
     /**
+     * 종목을 상장폐지 처리합니다. 이후 addCandleToAll 에서 해당 종목을 건너뜁니다.
+     */
+    public void delistStock(String name) {
+        delistedStocks.add(name);
+    }
+
+    /** 상장폐지 여부 반환 */
+    public boolean isDelistedStock(String name) {
+        return delistedStocks.contains(name);
+    }
+
+    /**
      * dataCache 기준으로 특정 종목의 마지막 종가를 반환합니다.
      * 캐시에 없으면 0을 반환합니다.
      */
@@ -340,10 +417,44 @@ public class ChartPanel extends VBox {
         return (long) d[d.length - 1][3];
     }
 
+    /**
+     * 특정 종목의 최신 등락률(%)을 반환합니다.
+     * 직전 캔들 종가 기준 turn-over-turn 변화율.
+     */
+    public double getChangePercentFor(String name, long price) {
+        double[][] d = dataCache.computeIfAbsent(name, k -> generateSeries(k, price));
+        if (d == null || d.length == 0) return 0.0;
+        double[] last = d[d.length - 1];
+        double prevClose = (d.length >= 2) ? d[d.length - 2][3] : last[0];
+        if (prevClose == 0) return 0.0;
+        return (last[3] - prevClose) / prevClose * 100.0;
+    }
+
+    /**
+     * 상한가(+30%) 도달 여부를 반환합니다.
+     */
+    public boolean isUpperLimitFor(String name, long price) {
+        double[][] d = dataCache.get(name);
+        if (d == null || d.length < 2) return false;
+        double prevClose = d[d.length - 2][3];
+        return prevClose > 0 && d[d.length - 1][3] >= prevClose * (1 + LIMIT_RATE) * 0.999;
+    }
+
+    /**
+     * 하한가(-30%) 도달 여부를 반환합니다.
+     */
+    public boolean isLowerLimitFor(String name, long price) {
+        double[][] d = dataCache.get(name);
+        if (d == null || d.length < 2) return false;
+        double prevClose = d[d.length - 2][3];
+        return prevClose > 0 && d[d.length - 1][3] <= prevClose * (1 - LIMIT_RATE) * 1.001;
+    }
+
     public void showStock(String name, long price) {
         this.currentStockName = name;
         // 캐시에 없을 때만 새로 생성 — 기존 addCandle 데이터를 보존
         this.data = dataCache.computeIfAbsent(name, k -> generateSeries(k, price));
+        scrollOffset = 0;  // 종목 전환 시 최신 캔들로 복귀
 
         boolean darkText = "카카오".equals(name);
         badge.setText(name);
@@ -454,15 +565,69 @@ public class ChartPanel extends VBox {
         if (data == null || data.length == 0) return;
 
         double[] last = data[data.length - 1];
-        boolean bull = last[3] >= last[0];
+
+        // ── 등락률: 직전 캔들 종가 기준 (turn-over-turn) ──
+        double prevClose = (data.length >= 2) ? data[data.length - 2][3] : last[0];
+        double changePct = (prevClose != 0) ? (last[3] - prevClose) / prevClose * 100.0 : 0.0;
+        boolean bull = changePct >= 0;
+
+        // ── 상한가/하한가 도달 판정 ──
+        boolean isUpperLimit = (prevClose > 0) && (last[3] >= prevClose * (1 + LIMIT_RATE) * 0.999);
+        boolean isLowerLimit = (prevClose > 0) && (last[3] <= prevClose * (1 - LIMIT_RATE) * 1.001);
+
+        String sign = changePct >= 0 ? "+" : "";
+        String colorHex = bull ? "#ff6b6b" : "#4A9EFF";
+        String bgColor  = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
+        String limitBg  = isUpperLimit ? "rgba(255,50,50,0.35)" : "rgba(50,100,255,0.35)";
 
         priceLabel.setText(String.format("%,.0f원", last[3]));
         priceLabel.setStyle(
-            "-fx-text-fill: " + (bull ? "#ff6b6b" : "#4A9EFF") + ";" +
+            "-fx-text-fill: " + colorHex + ";" +
             "-fx-font-family: 'SUIT';" +
             "-fx-font-weight: bold;" +
             "-fx-font-size: 24px;"
         );
+
+        if (isUpperLimit) {
+            changeLabel.setText(String.format("+%.2f%%  ▲ 상한가", changePct));
+            changeLabel.setStyle(
+                "-fx-text-fill: #FF4040;" +
+                "-fx-font-family: 'SUIT';" +
+                "-fx-font-weight: bold;" +
+                "-fx-font-size: 14px;" +
+                "-fx-padding: 4 10 4 10;" +
+                "-fx-background-color: " + limitBg + ";" +
+                "-fx-background-radius: 6;" +
+                "-fx-border-color: rgba(255,80,80,0.6);" +
+                "-fx-border-radius: 6;" +
+                "-fx-border-width: 1;"
+            );
+        } else if (isLowerLimit) {
+            changeLabel.setText(String.format("%.2f%%  ▼ 하한가", changePct));
+            changeLabel.setStyle(
+                "-fx-text-fill: #4A9EFF;" +
+                "-fx-font-family: 'SUIT';" +
+                "-fx-font-weight: bold;" +
+                "-fx-font-size: 14px;" +
+                "-fx-padding: 4 10 4 10;" +
+                "-fx-background-color: " + limitBg + ";" +
+                "-fx-background-radius: 6;" +
+                "-fx-border-color: rgba(80,120,255,0.6);" +
+                "-fx-border-radius: 6;" +
+                "-fx-border-width: 1;"
+            );
+        } else {
+            changeLabel.setText(String.format("%s%.2f%%", sign, changePct));
+            changeLabel.setStyle(
+                "-fx-text-fill: " + colorHex + ";" +
+                "-fx-font-family: 'SUIT';" +
+                "-fx-font-weight: bold;" +
+                "-fx-font-size: 15px;" +
+                "-fx-padding: 4 8 4 8;" +
+                "-fx-background-color: " + bgColor + ";" +
+                "-fx-background-radius: 6;"
+            );
+        }
     }
 
     private static String brandColor(String name) {
@@ -483,10 +648,14 @@ public class ChartPanel extends VBox {
         }
     }
 
-    /** 전체 data 중 최근 VISIBLE_CANDLES 개만 반환 (슬라이딩 윈도우) */
+    /** scrollOffset을 반영하여 VISIBLE_CANDLES 개 캔들 반환 */
     private double[][] getVisibleData() {
-        if (data.length <= VISIBLE_CANDLES) return data;
-        return java.util.Arrays.copyOfRange(data, data.length - VISIBLE_CANDLES, data.length);
+        int total  = data.length;
+        int safeOff = Math.max(0, Math.min(scrollOffset, Math.max(0, total - 1)));
+        int end    = total - safeOff;
+        end        = Math.max(Math.min(VISIBLE_CANDLES, total), Math.min(end, total));
+        int start  = Math.max(0, end - VISIBLE_CANDLES);
+        return java.util.Arrays.copyOfRange(data, start, end);
     }
 
     private void redraw() {
@@ -529,12 +698,16 @@ public class ChartPanel extends VBox {
         gc.setFill(Color.web("#8899aa"));
         gc.setStroke(Color.web("#ffffff", 0.07));
         gc.setLineWidth(1);
+        gc.setTextAlign(TextAlignment.RIGHT);   // ← 우측 정렬: 캔버스 끝에서 안쪽으로 그림
         for (int i = 0; i <= 5; i++) {
             double y = ch / 5.0 * i;
             gc.strokeLine(PAD_L, y, cw - AXIS_W, y);
+            double labelY = (i == 5) ? Math.min(y + 4, ch - 2) : y + 4;
+            if (labelY < 10) labelY = 10;
             long labelPrice = Math.round((maxP - (maxP - minP) * i / 5) / 100.0) * 100;
-            gc.fillText(String.format("%,d", labelPrice), cw - AXIS_W + 6, y + 4);
+            gc.fillText(String.format("%,d", labelPrice), cw - 4, labelY);  // x=cw-4: 오른쪽 끝 기준
         }
+        gc.setTextAlign(TextAlignment.LEFT);    // 이후 다른 텍스트 위해 원복
 
         if (showCandle) {
             for (int i = 0; i < n; i++) {
@@ -598,7 +771,9 @@ public class ChartPanel extends VBox {
                 gc.fillRoundRect(cw - AXIS_W, mouseY - 10, AXIS_W - 2, 20, 5, 5);
                 gc.setFill(Color.web("#06124A"));
                 gc.setFont(Font.font("SUIT", FontWeight.BOLD, 10));
-                gc.fillText(String.format("%,d", (long) curPrice), cw - AXIS_W + 4, mouseY + 4);
+                gc.setTextAlign(TextAlignment.RIGHT);
+                gc.fillText(String.format("%,d", (long) curPrice), cw - 4, mouseY + 4);
+                gc.setTextAlign(TextAlignment.LEFT);
             }
             gc.setLineDashes();
         }
@@ -632,8 +807,10 @@ public class ChartPanel extends VBox {
 
         gc.setFill(Color.web("#8899aa"));
         gc.setFont(Font.font("SUIT", 10));
-        gc.fillText(String.format("%,.0f", maxVol), cw - AXIS_W + 4, 12);
-        gc.fillText(String.format("%,.0f", maxVol / 2), cw - AXIS_W + 4, ch / 2 + 4);
+        gc.setTextAlign(TextAlignment.RIGHT);
+        gc.fillText(String.format("%,.0f", maxVol),     cw - 4, 12);
+        gc.fillText(String.format("%,.0f", maxVol / 2), cw - 4, ch / 2 + 4);
+        gc.setTextAlign(TextAlignment.LEFT);
 
         if (mouseX >= 0 && mouseX <= cw - AXIS_W) {
             gc.setStroke(Color.web("#ffffff", 0.28));
@@ -668,12 +845,28 @@ public class ChartPanel extends VBox {
         StackPane.setMargin(tooltipBox, new Insets(ty, 0, 0, tx));
 
         boolean bull = d[3] >= d[0];
+        double changePct = (d[0] != 0) ? (d[3] - d[0]) / d[0] * 100.0 : 0.0;
+        String sign = changePct >= 0 ? "+" : "";
+        String colorHex = bull ? "#ff6b6b" : "#4A9EFF";
+        String bgColor  = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
+
         priceLabel.setText(String.format("%,.0f원", d[3]));
         priceLabel.setStyle(
-            "-fx-text-fill: " + (bull ? "#ff6b6b" : "#4A9EFF") + ";" +
+            "-fx-text-fill: " + colorHex + ";" +
             "-fx-font-family: 'SUIT';" +
             "-fx-font-weight: bold;" +
             "-fx-font-size: 24px;"
+        );
+
+        changeLabel.setText(String.format("%s%.2f%%", sign, changePct));
+        changeLabel.setStyle(
+            "-fx-text-fill: " + colorHex + ";" +
+            "-fx-font-family: 'SUIT';" +
+            "-fx-font-weight: bold;" +
+            "-fx-font-size: 15px;" +
+            "-fx-padding: 4 8 4 8;" +
+            "-fx-background-color: " + bgColor + ";" +
+            "-fx-background-radius: 6;"
         );
     }
 }

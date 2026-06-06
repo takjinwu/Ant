@@ -29,7 +29,10 @@ import java.util.function.BiConsumer;
 public class StockListPanel extends VBox {
 
     private final Map<String, Long> stocks = new LinkedHashMap<>();
+    private final Map<String, Long> prevPrices = new LinkedHashMap<>();  // 이전 가격 (등락률 계산용)
+    private final java.util.Set<String> delistedStocks = new java.util.HashSet<>();  // 상장폐지 종목
     private BiConsumer<String, Long> onStockSelected = null;
+    private java.util.function.Consumer<String> onDelisted = null;  // 상장폐지 이벤트 콜백
 
     private final VBox rowBox;
     private HBox selectedRow = null;
@@ -54,18 +57,19 @@ public class StockListPanel extends VBox {
         setSpacing(14);
 
         Label header = new Label("📈 주식 목록");
-        header.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 17));
+        header.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 20));
         header.setTextFill(Color.web("#FFFFFF"));
 
         Label nameCol = new Label("종목명");
-        nameCol.setFont(Font.font("SUIT", FontWeight.BOLD, 12));
+        nameCol.setFont(Font.font("SUIT", FontWeight.BOLD, 14));
+ 
         nameCol.setTextFill(Color.web("#AAB4D4"));
 
         Region headSpacer = new Region();
         HBox.setHgrow(headSpacer, Priority.ALWAYS);
 
         Label priceCol = new Label("현재가");
-        priceCol.setFont(Font.font("SUIT", FontWeight.BOLD, 12));
+        priceCol.setFont(Font.font("SUIT", FontWeight.BOLD, 14));
         priceCol.setTextFill(Color.web("#AAB4D4"));
 
         HBox colHeader = new HBox(8, nameCol, headSpacer, priceCol);
@@ -123,9 +127,25 @@ public class StockListPanel extends VBox {
     }
 
 
-    /** 전체 종목 맵을 반환합니다 (ChartPanel.addCandleToAll 에 전달용). */
+    /** 전체 종목 맵을 반환합니다 (ChartPanel.addCandleToAll 에 전달용). 상장폐지 종목 제외. */
     public java.util.Map<String, Long> getStocks() {
-        return java.util.Collections.unmodifiableMap(stocks);
+        java.util.Map<String, Long> active = new java.util.LinkedHashMap<>();
+        for (var entry : stocks.entrySet()) {
+            if (!delistedStocks.contains(entry.getKey())) {
+                active.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return java.util.Collections.unmodifiableMap(active);
+    }
+
+    /** 상장폐지 이벤트 리스너 등록 */
+    public void setOnDelisted(java.util.function.Consumer<String> listener) {
+        this.onDelisted = listener;
+    }
+
+    /** 해당 종목이 상장폐지 상태인지 반환 */
+    public boolean isDelisted(String name) {
+        return delistedStocks.contains(name);
     }
 
     /**
@@ -144,18 +164,90 @@ public class StockListPanel extends VBox {
 
     public void updatePrice(String stockName, long price) {
         if (!stocks.containsKey(stockName)) return;
+        if (delistedStocks.contains(stockName)) return;  // 이미 상장폐지된 종목은 무시
+
+        // ── 1,000원 미만 → 상장폐지 ──
+        if (price < 1_000) {
+            stocks.put(stockName, price);
+            triggerDelist(stockName);
+            return;
+        }
 
         stocks.put(stockName, price);
+
+        // ── 등락률: ChartPanel 직전 캔들 종가 기준 (turn-over-turn) ──
+        double changePct;
+        boolean upperLimit = false, lowerLimit = false;
+        if (chartPanel != null) {
+            changePct   = chartPanel.getChangePercentFor(stockName, price);
+            upperLimit  = chartPanel.isUpperLimitFor(stockName, price);
+            lowerLimit  = chartPanel.isLowerLimitFor(stockName, price);
+        } else {
+            long oldPrice = prevPrices.getOrDefault(stockName, price);
+            changePct = (oldPrice != 0) ? (price - oldPrice) / (double) oldPrice * 100.0 : 0.0;
+        }
+        prevPrices.put(stockName, price);
+
+        boolean bull = changePct >= 0;
+        String colorHex = bull ? "#ff6b6b" : "#4A9EFF";
 
         for (var node : rowBox.getChildren()) {
             if (node instanceof HBox row && stockName.equals(row.getUserData())) {
                 Circle trendDot = (Circle) row.getChildren().get(0);
-                Label priceLabel = (Label) ((VBox) row.getChildren().get(3)).getChildren().get(0);
+                VBox rightBox = (VBox) row.getChildren().get(3);
+                Label priceLabel = (Label) rightBox.getChildren().get(0);
+                Label changeLabel = (Label) rightBox.getChildren().get(1);
 
-                Color trendColor = getTrendColor(stockName, price);
+                Color trendColor = Color.web(colorHex);
                 trendDot.setFill(trendColor);
                 trendDot.setEffect(new DropShadow(8, trendColor));
+
                 priceLabel.setText(formatMoney(price) + " 원");
+                priceLabel.setTextFill(Color.web(colorHex));
+
+                // 상한가/하한가 뱃지
+                if (upperLimit) {
+                    changeLabel.setText(String.format("+%.2f%% ▲상한가", changePct));
+                    changeLabel.setStyle(
+                        "-fx-text-fill: #FF4040;" +
+                        "-fx-font-family: 'SUIT';" +
+                        "-fx-font-weight: bold;" +
+                        "-fx-font-size: 10px;" +
+                        "-fx-padding: 2 6 2 6;" +
+                        "-fx-background-color: rgba(255,50,50,0.25);" +
+                        "-fx-background-radius: 5;" +
+                        "-fx-border-color: rgba(255,80,80,0.55);" +
+                        "-fx-border-radius: 5;" +
+                        "-fx-border-width: 1;"
+                    );
+                } else if (lowerLimit) {
+                    changeLabel.setText(String.format("%.2f%% ▼하한가", changePct));
+                    changeLabel.setStyle(
+                        "-fx-text-fill: #4A9EFF;" +
+                        "-fx-font-family: 'SUIT';" +
+                        "-fx-font-weight: bold;" +
+                        "-fx-font-size: 10px;" +
+                        "-fx-padding: 2 6 2 6;" +
+                        "-fx-background-color: rgba(50,100,255,0.25);" +
+                        "-fx-background-radius: 5;" +
+                        "-fx-border-color: rgba(80,130,255,0.55);" +
+                        "-fx-border-radius: 5;" +
+                        "-fx-border-width: 1;"
+                    );
+                } else {
+                    String sign = bull ? "+" : "";
+                    String bgColor = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
+                    changeLabel.setText(String.format("%s%.2f%%", sign, changePct));
+                    changeLabel.setStyle(
+                        "-fx-text-fill: " + colorHex + ";" +
+                        "-fx-font-family: 'SUIT';" +
+                        "-fx-font-weight: bold;" +
+                        "-fx-font-size: 13px;" +
+                        "-fx-padding: 2 6 2 6;" +
+                        "-fx-background-color: " + bgColor + ";" +
+                        "-fx-background-radius: 5;"
+                    );
+                }
                 break;
             }
         }
@@ -164,29 +256,44 @@ public class StockListPanel extends VBox {
     private HBox buildStockRow(String name, long price) {
         Color trendColor = getTrendColor(name, price);
 
-        Circle trendDot = new Circle(5);
+        Circle trendDot = new Circle(6);
         trendDot.setFill(trendColor);
         trendDot.setStroke(Color.web("#FFFFFF", 0.35));
         trendDot.setStrokeWidth(1);
         trendDot.setEffect(new DropShadow(8, trendColor));
 
         Label nameLabel = new Label(name);
-        nameLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 14));
+        nameLabel.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 16));
         nameLabel.setTextFill(Color.web("#E0E8FF"));
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
-        Label priceLabel = new Label(formatMoney(price) + " 원");
-        priceLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 14));
-        priceLabel.setTextFill(Color.web("#7EDDFF"));
+        boolean bull = getTrendBool(name, price);
+        String colorHex = bull ? "#ff6b6b" : "#4A9EFF";
+        String bgColor  = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
 
-        VBox rightBox = new VBox(priceLabel);
+        Label priceLabel = new Label(formatMoney(price) + " 원");
+        priceLabel.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 16));
+        priceLabel.setTextFill(Color.web(colorHex));
+
+        Label changeLabel = new Label("+0.00%");
+        changeLabel.setStyle(
+            "-fx-text-fill: " + colorHex + ";" +
+            "-fx-font-family: 'SUIT';" +
+            "-fx-font-weight: bold;" +
+            "-fx-font-size: 11px;" +
+            "-fx-padding: 2 6 2 6;" +
+            "-fx-background-color: " + bgColor + ";" +
+            "-fx-background-radius: 5;"
+        );
+
+        VBox rightBox = new VBox(2, priceLabel, changeLabel);
         rightBox.setAlignment(Pos.CENTER_RIGHT);
 
         HBox row = new HBox(8, trendDot, nameLabel, spacer, rightBox);
         row.setAlignment(Pos.CENTER_LEFT);
-        row.setPadding(new Insets(10, 12, 10, 12));
+        row.setPadding(new Insets(12, 14, 12, 14));
         row.setUserData(name);
         applyRowStyle(row, false);
 
@@ -201,21 +308,96 @@ public class StockListPanel extends VBox {
         return row;
     }
 
+    /**
+     * 상장폐지 처리 — 해당 종목 행을 비활성화하고 상장폐지 뱃지를 표시합니다.
+     */
+    private void triggerDelist(String name) {
+        delistedStocks.add(name);
+
+        for (var node : rowBox.getChildren()) {
+            if (!(node instanceof HBox row)) continue;
+            if (!name.equals(row.getUserData())) continue;
+
+            // 클릭/호버 이벤트 제거
+            row.setOnMouseClicked(null);
+            row.setOnMouseEntered(null);
+            row.setOnMouseExited(null);
+            row.setStyle(
+                "-fx-background-color: rgba(120,30,30,0.18);" +
+                "-fx-background-radius: 12;" +
+                "-fx-cursor: default;" +
+                "-fx-opacity: 0.62;"
+            );
+
+            // 상태 점 → 회색
+            Circle trendDot = (Circle) row.getChildren().get(0);
+            trendDot.setFill(Color.web("#888888"));
+            trendDot.setEffect(null);
+
+            // 종목명 → 회색
+            Label nameLabel = (Label) row.getChildren().get(1);
+            nameLabel.setTextFill(Color.web("#999999"));
+
+            // 가격/등락률 → 상장폐지 표시
+            VBox rightBox = (VBox) row.getChildren().get(3);
+            Label priceLabel  = (Label) rightBox.getChildren().get(0);
+            Label changeLabel = (Label) rightBox.getChildren().get(1);
+
+            priceLabel.setText("상장폐지");
+            priceLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
+            priceLabel.setTextFill(Color.web("#FF5555"));
+
+            changeLabel.setText("거래정지");
+            changeLabel.setStyle(
+                "-fx-text-fill: #FF5555;" +
+                "-fx-font-family: 'SUIT';" +
+                "-fx-font-weight: bold;" +
+                "-fx-font-size: 10px;" +
+                "-fx-padding: 2 6 2 6;" +
+                "-fx-background-color: rgba(255,50,50,0.20);" +
+                "-fx-background-radius: 5;" +
+                "-fx-border-color: rgba(255,80,80,0.55);" +
+                "-fx-border-radius: 5;" +
+                "-fx-border-width: 1;"
+            );
+            break;
+        }
+
+        // 선택 중이던 행이 상장폐지되면 선택 해제
+        if (selectedRow != null && name.equals(selectedRow.getUserData())) {
+            selectedRow = null;
+        }
+
+        // 콜백 발화
+        if (onDelisted != null) {
+            javafx.application.Platform.runLater(() -> onDelisted.accept(name));
+        }
+    }
+
     private void selectRow(HBox row, String name, long price) {
         if (selectedRow != null) applyRowStyle(selectedRow, false);
         selectedRow = row;
         applyRowSelectedStyle(row);
 
         if (onStockSelected != null) {
-            onStockSelected.accept(name, price);
+            // 행 생성 시 캡처된 price 대신 stocks 맵에서 최신 가격을 조회
+            long latestPrice = stocks.getOrDefault(name, price);
+            onStockSelected.accept(name, latestPrice);
         }
     }
 
     private Color getTrendColor(String stockName, long price) {
-        boolean bull = (chartPanel != null)
+        return getTrendBool(stockName, price) ? Color.web("#ff6b6b") : Color.web("#4A9EFF");
+    }
+
+    private boolean getTrendBull(String stockName, long price) {
+        return getTrendBool(stockName, price);
+    }
+
+    private boolean getTrendBool(String stockName, long price) {
+        return (chartPanel != null)
                 ? chartPanel.isBullTrendFor(stockName, price)
                 : ChartPanel.isBullTrend(stockName, price);
-        return bull ? Color.web("#ff6b6b") : Color.web("#4A9EFF");
     }
 
     private void applyRowStyle(HBox row, boolean hover) {

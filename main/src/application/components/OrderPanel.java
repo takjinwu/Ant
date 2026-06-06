@@ -1,5 +1,6 @@
 package application.components;
 
+import application.components.StockListPanel;
 import javafx.animation.FadeTransition;
 import javafx.animation.KeyFrame;
 import javafx.animation.KeyValue;
@@ -104,13 +105,14 @@ public class OrderPanel extends VBox {
         HBox ratioBox = new HBox(6, btn10, btn25, btn50, btnAll);
         ratioBox.setAlignment(Pos.CENTER_LEFT);
 
-        // ── 수량 입력 ──
+        // ── 수량 입력 (라벨 + 필드 한 줄 배치) ──
         Label qtyHeader = new Label("수량 (주)");
         qtyHeader.setFont(Font.font("SUIT", FontWeight.BOLD, 12));
         qtyHeader.setTextFill(Color.web("#AAB4D4"));
+        qtyHeader.setMinWidth(58);
 
         qtyField = new TextField("0");
-        qtyField.setFont(Font.font("SUIT", FontWeight.BOLD, 16));
+        qtyField.setFont(Font.font("SUIT", FontWeight.BOLD, 15));
         qtyField.setStyle(
             "-fx-background-color: rgba(255,255,255,0.10);" +
             "-fx-text-fill: #E8F0FF;" +
@@ -118,13 +120,18 @@ public class OrderPanel extends VBox {
             "-fx-background-radius: 12;" +
             "-fx-border-color: rgba(255,255,255,0.22);" +
             "-fx-border-radius: 12;" +
-            "-fx-padding: 8 14 8 14;"
+            "-fx-padding: 7 14 7 14;"
         );
+        HBox.setHgrow(qtyField, Priority.ALWAYS);
         // 숫자만 허용
         qtyField.textProperty().addListener((obs, oldVal, newVal) -> {
             if (!newVal.matches("\\d*")) qtyField.setText(newVal.replaceAll("[^\\d]", ""));
             clearFeedback();
         });
+
+        HBox qtyRow = new HBox(10, qtyHeader, qtyField);
+        qtyRow.setAlignment(Pos.CENTER_LEFT);
+        qtyRow.setPadding(new Insets(4, 0, 4, 0));
 
         // ── 매수 / 매도 버튼 (고정 크기) ──
         Button buyButton  = buildOrderButton("매수", true);
@@ -135,7 +142,7 @@ public class OrderPanel extends VBox {
 
         HBox orderBtnBox = new HBox(10, buyButton, sellButton);
         orderBtnBox.setAlignment(Pos.CENTER);
-        VBox.setMargin(orderBtnBox, new Insets(10, 0, 0, 0));
+        VBox.setMargin(orderBtnBox, new Insets(22, 0, 0, 0));
 
         // ── 피드백 라벨 ──
         feedbackLabel = new Label("");
@@ -147,7 +154,7 @@ public class OrderPanel extends VBox {
             header,
             infoBox,
             ratioHeader, ratioBox,
-            qtyHeader, qtyField,
+            qtyRow,
             orderBtnBox,
             feedbackLabel
         );
@@ -188,6 +195,17 @@ public class OrderPanel extends VBox {
         priceLabel.setText("현재가: " + formatMoney(price) + " 원");
         qtyField.setText("0");
         clearFeedback();
+    }
+
+    /**
+     * 턴이 넘어갔을 때 선택된 종목의 현재가를 StockListPanel에서 갱신
+     */
+    public void refreshPrice(StockListPanel stockList) {
+        if (selectedStock == null || selectedStock.isBlank()) return;
+        long newPrice = stockList.getPrice(selectedStock);
+        if (newPrice > 0) {
+            updatePrice(newPrice);
+        }
     }
 
     /**
@@ -251,7 +269,7 @@ public class OrderPanel extends VBox {
                 setFeedback("✅ " + selectedStock + " " + qty + "주 매수 완료!", true);
                 showToast(true, selectedStock, qty);
             } else {
-                setFeedback("❌ 잔액이 부족합니다.", false);
+                setFeedback("❌ 잔액이 부족합니다.", false); return;
             }
         } else {
             boolean ok = wallet.sell(selectedStock, qty, currentPrice);
@@ -265,7 +283,7 @@ public class OrderPanel extends VBox {
                 currentPrice = 0L;
             } else {
                 int held = wallet.getQuantity(selectedStock);
-                setFeedback("❌ 보유 수량 부족 (보유: " + held + "주)", false);
+                setFeedback("❌ 보유 수량 부족 (보유: " + held + "주)", false); return;
             }
         }
 

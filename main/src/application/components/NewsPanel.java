@@ -206,7 +206,7 @@ public class NewsPanel extends Pane {
 
 	private void startNewsTimer() {
 		newsTimer = new Timeline(
-				new KeyFrame(Duration.minutes(3), e -> nextTurn())
+				new KeyFrame(Duration.minutes(1), e -> nextTurn())
 		);
 
 		newsTimer.setCycleCount(Timeline.INDEFINITE);

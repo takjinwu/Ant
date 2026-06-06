@@ -15,6 +15,7 @@ import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Scene;
+import javafx.scene.Group;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
@@ -38,12 +39,16 @@ import javafx.stage.StageStyle;
 import javafx.util.Duration;
 import javafx.scene.input.KeyCode;
 import javafx.scene.image.Image;
+import javafx.scene.transform.Scale;
 import javafx.stage.Screen;
-
+import javafx.geometry.Rectangle2D;
 
 public class Main extends Application {
 
 	private MediaPlayer bgmPlayer;
+
+	private static final double BASE_W = 1920;
+	private static final double BASE_H = 1080;
 
 	private static final double CHART_H = 620;
 	private static final double BOTTOM_H = 260;
@@ -51,13 +56,18 @@ public class Main extends Application {
 	private static final double COLUMN_H = CHART_H + GAP + BOTTOM_H;
 
 	private StackPane appRoot;
+	private Pane responsiveRoot;
+	private Group scaledGroup;
+	private Scale uiScale;
 	private Pane zoomLayer;
 	private StockListPanel stockListRef;
+	private OrderPanel orderRef;
 
 	private String uiFontFamily = Font.getDefault().getFamily();
 
 	private Stage currentStage;
 	private Scene mainScene;
+	private WalletPanel walletRef;
 
 	private enum DisplayMode {
 		FULLSCREEN,
@@ -104,6 +114,10 @@ public class Main extends Application {
 				if (stockListRef != null) {
 					chartPanel.addCandleToAll(stockListRef.getStocks(), effect);
 					stockListRef.updateAllPrices(chartPanel);
+					// 턴 변경 후 OrderPanel에 선택된 종목의 현재가 갱신
+					if (orderRef != null) {
+						orderRef.refreshPrice(stockListRef);
+					}
 				} else {
 					chartPanel.addCandle(effect);
 				}
@@ -121,9 +135,32 @@ public class Main extends Application {
 			zoomLayer.setPickOnBounds(false);
 
 			appRoot = new StackPane(root, zoomLayer);
+			appRoot.setPrefSize(BASE_W, BASE_H);
+			appRoot.setMinSize(BASE_W, BASE_H);
+			appRoot.setMaxSize(BASE_W, BASE_H);
+			root.setPrefSize(BASE_W, BASE_H);
+			zoomLayer.setPrefSize(BASE_W, BASE_H);
 
-			mainScene = new Scene(appRoot, 1920, 1080);
+			scaledGroup = new Group(appRoot);
+			scaledGroup.setManaged(false);
+			uiScale = new Scale(1, 1, 0, 0);
+			scaledGroup.getTransforms().add(uiScale);
+
+			responsiveRoot = new Pane(scaledGroup);
+			responsiveRoot.setStyle(
+				"-fx-background-color: linear-gradient(to right, " +
+					"#06124A 0%, " +
+					"#1A0B5E 45%, " +
+					"#5B006E 75%, " +
+					"#9B005C 100%);"
+			);
+
+			Rectangle2D visualBounds = Screen.getPrimary().getVisualBounds();
+			mainScene = new Scene(responsiveRoot, visualBounds.getWidth(), visualBounds.getHeight());
 			mainScene.getStylesheets().add(getClass().getResource("application.css").toExternalForm());
+
+			responsiveRoot.widthProperty().addListener((obs, oldVal, newVal) -> updateResponsiveScale());
+			responsiveRoot.heightProperty().addListener((obs, oldVal, newVal) -> updateResponsiveScale());
 
 			mainScene.setOnKeyPressed(e -> {
 				if (e.isAltDown() && e.getCode() == KeyCode.ENTER) {
@@ -160,12 +197,85 @@ public class Main extends Application {
 			Media bgm = new Media(bgmUrl.toExternalForm());
 			bgmPlayer = new MediaPlayer(bgm);
 			bgmPlayer.setCycleCount(MediaPlayer.INDEFINITE);
-			bgmPlayer.setVolume(0.3);
+			bgmPlayer.setVolume(0.1);
 			bgmPlayer.play();
 
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	private void showDelistNotice(String stockName, long lostValue) {
+		Label icon  = new Label("📉");
+		icon.setStyle("-fx-font-size: 42px;");
+
+		Label title = new Label("상장폐지");
+		title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 28));
+		title.setTextFill(Color.web("#FF5555"));
+
+		Label nameLabel = new Label(stockName);
+		nameLabel.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 20));
+		nameLabel.setTextFill(Color.WHITE);
+
+		Label desc = new Label("주가가 1,000원 미만으로 하락하여\n상장 요건을 충족하지 못했습니다.");
+		desc.setFont(Font.font(uiFontFamily, 14));
+		desc.setTextFill(Color.web("#BBCCDD"));
+		desc.setStyle("-fx-text-alignment: center;");
+		desc.setWrapText(true);
+
+		Label lossLabel;
+		if (lostValue > 0) {
+			lossLabel = new Label(String.format("보유 주식 손실: -%,d 원", lostValue));
+			lossLabel.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 15));
+			lossLabel.setTextFill(Color.web("#FF7777"));
+			lossLabel.setStyle(
+				"-fx-background-color: rgba(255,50,50,0.18);" +
+				"-fx-background-radius: 10;" +
+				"-fx-padding: 8 18 8 18;"
+			);
+		} else {
+			lossLabel = new Label("보유 주식 없음 — 직접 손실 없음");
+			lossLabel.setFont(Font.font(uiFontFamily, 14));
+			lossLabel.setTextFill(Color.web("#88AACC"));
+		}
+
+		Button closeBtn = new Button("확인");
+		closeBtn.setStyle(
+			"-fx-background-color: rgba(255,85,85,0.75);" +
+			"-fx-text-fill: white;" +
+			"-fx-font-family: '" + uiFontFamily + "';" +
+			"-fx-font-size: 16px;" +
+			"-fx-font-weight: bold;" +
+			"-fx-background-radius: 16;" +
+			"-fx-padding: 10 36 10 36;" +
+			"-fx-cursor: hand;"
+		);
+
+		VBox card = new VBox(14, icon, title, nameLabel, desc, lossLabel, closeBtn);
+		card.setAlignment(Pos.CENTER);
+		card.setPadding(new Insets(36, 48, 36, 48));
+		card.setMaxWidth(420);
+		card.setStyle(
+			"-fx-background-color: linear-gradient(to bottom right," +
+				"rgba(80,10,10,0.92), rgba(30,10,50,0.95));" +
+			"-fx-background-radius: 28;" +
+			"-fx-border-color: rgba(255,80,80,0.55);" +
+			"-fx-border-radius: 28;" +
+			"-fx-border-width: 1.5;" +
+			"-fx-effect: dropshadow(gaussian, rgba(255,50,50,0.45), 40, 0.3, 0, 0);"
+		);
+
+		// 오버레이 배경
+		javafx.scene.layout.StackPane overlay = new javafx.scene.layout.StackPane(card);
+		overlay.setStyle("-fx-background-color: rgba(0,0,0,0.55);");
+
+		appRoot.getChildren().add(overlay);
+
+		closeBtn.setOnAction(e -> appRoot.getChildren().remove(overlay));
+		// 오버레이 클릭 시 닫기
+		overlay.setOnMouseClicked(e -> {
+			if (e.getTarget() == overlay) appRoot.getChildren().remove(overlay);
+		});
 	}
 
 	private void showStartNotice(NewsPanel newsPanel) {
@@ -465,7 +575,31 @@ public class Main extends Application {
 
 	    optionStage.setScene(scene);
 	    optionStage.show();
+	    
 	}
+	private void updateResponsiveScale() {
+		if (responsiveRoot == null || scaledGroup == null || uiScale == null) return;
+
+		double w = responsiveRoot.getWidth();
+		double h = responsiveRoot.getHeight();
+
+		if (w <= 0 || h <= 0) return;
+
+		// 1920x1080 기준으로 만든 UI를 현재 화면 안에 반드시 들어오도록 축소/확대한다.
+		// 핵심: Scale의 pivot을 (0,0)으로 고정해야 아래로 밀리거나 클릭 위치가 어긋나지 않는다.
+		double scale = Math.min(w / BASE_W, h / BASE_H);
+
+		uiScale.setX(scale);
+		uiScale.setY(scale);
+
+		double scaledW = BASE_W * scale;
+		double scaledH = BASE_H * scale;
+
+		// 남는 공간은 중앙 정렬한다. 화면 비율이 달라도 UI가 잘리지 않는다.
+		scaledGroup.setLayoutX(Math.max(0, (w - scaledW) / 2.0));
+		scaledGroup.setLayoutY(Math.max(0, (h - scaledH) / 2.0));
+	}
+
 	private void toggleDisplayMode() {
 		if (currentMode == DisplayMode.WINDOWED) {
 			applyDisplayMode(DisplayMode.BORDERLESS);
@@ -476,6 +610,11 @@ public class Main extends Application {
 
 	private void applyDisplayMode(DisplayMode mode) {
 		Stage oldStage = currentStage;
+
+		Screen targetScreen = getCurrentScreen(oldStage);
+		Rectangle2D bounds = targetScreen.getBounds();
+		Rectangle2D visualBounds = targetScreen.getVisualBounds();
+
 		Stage newStage = new Stage();
 
 		if (mode == DisplayMode.BORDERLESS) {
@@ -497,37 +636,89 @@ public class Main extends Application {
 		currentMode = mode;
 
 		if (mode == DisplayMode.FULLSCREEN) {
-			newStage.show();
-			newStage.setFullScreen(true);
-		}
-		else if (mode == DisplayMode.BORDERLESS) {
-			javafx.geometry.Rectangle2D bounds = Screen.getPrimary().getBounds();
-
 			newStage.setX(bounds.getMinX());
 			newStage.setY(bounds.getMinY());
 			newStage.setWidth(bounds.getWidth());
 			newStage.setHeight(bounds.getHeight());
 			newStage.show();
+			newStage.setFullScreen(true);
+			Platform.runLater(() -> updateResponsiveScale());
+		}
+		else if (mode == DisplayMode.BORDERLESS) {
+			newStage.setX(bounds.getMinX());
+			newStage.setY(bounds.getMinY());
+			newStage.setWidth(bounds.getWidth());
+			newStage.setHeight(bounds.getHeight());
+			newStage.show();
+			Platform.runLater(() -> updateResponsiveScale());
 		}
 		else if (mode == DisplayMode.WINDOWED) {
-			newStage.setWidth(1920);
-			newStage.setHeight(1080);
-			newStage.centerOnScreen();
+			double winW = Math.min(1280, visualBounds.getWidth() * 0.9);
+			double winH = Math.min(720, visualBounds.getHeight() * 0.9);
+
+			newStage.setWidth(winW);
+			newStage.setHeight(winH);
+
+			double x = visualBounds.getMinX() + (visualBounds.getWidth() - winW) / 2;
+			double y = visualBounds.getMinY() + (visualBounds.getHeight() - winH) / 2;
+
+			newStage.setX(x);
+			newStage.setY(y);
+
 			newStage.show();
+			newStage.setAlwaysOnTop(true);
+
+			Platform.runLater(() -> {
+			    newStage.setAlwaysOnTop(false);
+			    updateResponsiveScale();
+			});
 		}
 	}
+	private Screen getCurrentScreen(Stage stage) {
+		if (stage == null) {
+			return Screen.getPrimary();
+		}
 
+		double centerX = stage.getX() + stage.getWidth() / 2;
+		double centerY = stage.getY() + stage.getHeight() / 2;
+
+		for (Screen screen : Screen.getScreens()) {
+		    Rectangle2D bounds = screen.getBounds();
+
+			if (centerX >= bounds.getMinX() &&
+				centerX <= bounds.getMaxX() &&
+				centerY >= bounds.getMinY() &&
+				centerY <= bounds.getMaxY()) {
+				return screen;
+			}
+		}
+
+		return Screen.getPrimary();
+	}
 	private HBox buildCenter(NewsPanel newsPanel, ChartPanel chartPanel) {
 		OrderPanel order = new OrderPanel(370, BOTTOM_H);
+		orderRef = order;
 		WalletPanel wallet = new WalletPanel(370, BOTTOM_H);
 		StockListPanel stockList = new StockListPanel(520, COLUMN_H);
 		stockListRef = stockList;
+		walletRef = wallet;
 
 		order.setWallet(wallet);
 		stockList.setChartPanel(chartPanel);
 
+		// ── 상장폐지 이벤트 처리 ──
+		stockList.setOnDelisted(name -> {
+			// ChartPanel에 상장폐지 마킹 (이후 캔들 추가 차단)
+			chartPanel.delistStock(name);
+			// 지갑에서 해당 종목 강제 소각 (현금 환급 없음)
+			long lost = walletRef.delistStock(name);
+			// 상장폐지 안내 팝업
+			showDelistNotice(name, lost);
+		});
+
 		stockList.setOnStockSelected((name, price) -> {
 			order.setSelectedStock(name, price);
+			order.updatePrice(price);
 			chartPanel.showStock(name, price);
 		});
 
