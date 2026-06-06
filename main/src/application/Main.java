@@ -49,25 +49,27 @@ public class Main extends Application {
 
 	private static final double BASE_W = 1920;
 	private static final double BASE_H = 1080;
-
+	private String currentMusic = "/music/calm.mp3";
+	private String previousMusic = currentMusic;
 	private static final double CHART_H = 620;
 	private static final double BOTTOM_H = 260;
 	private static final double GAP = 18;
 	private static final double COLUMN_H = CHART_H + GAP + BOTTOM_H;
-
+	private double currentVolume = 0.5;
 	private StackPane appRoot;
 	private Pane responsiveRoot;
 	private Group scaledGroup;
 	private Scale uiScale;
 	private Pane zoomLayer;
+
 	private StockListPanel stockListRef;
+	private WalletPanel walletRef;
 	private OrderPanel orderRef;
 
 	private String uiFontFamily = Font.getDefault().getFamily();
 
 	private Stage currentStage;
 	private Scene mainScene;
-	private WalletPanel walletRef;
 
 	private enum DisplayMode {
 		FULLSCREEN,
@@ -123,11 +125,12 @@ public class Main extends Application {
 				}
 			});
 
-			newsPanel.setImageClickHandler(imageView -> {
-				showImageZoom(imageView);
-			});
+			newsPanel.setImageClickHandler(imageView -> showImageZoom(imageView));
+
+			newsPanel.setGameFinishedHandler(() -> showGameOverDialog());
 
 			currentStage = primaryStage;
+
 			root.setTop(buildTop(newsPanel));
 			root.setCenter(buildCenter(newsPanel, chartPanel));
 
@@ -138,11 +141,13 @@ public class Main extends Application {
 			appRoot.setPrefSize(BASE_W, BASE_H);
 			appRoot.setMinSize(BASE_W, BASE_H);
 			appRoot.setMaxSize(BASE_W, BASE_H);
+
 			root.setPrefSize(BASE_W, BASE_H);
 			zoomLayer.setPrefSize(BASE_W, BASE_H);
 
 			scaledGroup = new Group(appRoot);
 			scaledGroup.setManaged(false);
+
 			uiScale = new Scale(1, 1, 0, 0);
 			scaledGroup.getTransforms().add(uiScale);
 
@@ -182,26 +187,232 @@ public class Main extends Application {
 	}
 
 	private void playBgm() {
-		try {
-			java.net.URL bgmUrl = getClass().getResource("/music/main_bgm.mp3");
 
-			if (bgmUrl == null) {
-				bgmUrl = getClass().getResource("music/main_bgm.mp3");
+		try {
+
+			if(bgmPlayer != null) {
+				bgmPlayer.stop();
 			}
 
+			java.net.URL bgmUrl = getClass().getResource(currentMusic);
+
 			if (bgmUrl == null) {
-				System.out.println("BGM 파일을 찾을 수 없습니다.");
+				System.out.println("BGM 파일 없음 : " + currentMusic);
 				return;
 			}
 
-			Media bgm = new Media(bgmUrl.toExternalForm());
+			Media bgm = new Media(
+				bgmUrl.toExternalForm()
+			);
+
 			bgmPlayer = new MediaPlayer(bgm);
+
 			bgmPlayer.setCycleCount(MediaPlayer.INDEFINITE);
-			bgmPlayer.setVolume(0.1);
+			bgmPlayer.setVolume(currentVolume);
+
 			bgmPlayer.play();
 
-		} catch (Exception e) {
+		}
+		catch(Exception e) {
 			e.printStackTrace();
+		}
+	}
+
+	private void showStartNotice(NewsPanel newsPanel) {
+		Label notice = new Label("10초 후 시작됩니다");
+		Button skipButton = new Button("SKIP ▶▶");
+
+		notice.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 34));
+		notice.setTextFill(Color.WHITE);
+		notice.setStyle(
+			"-fx-background-color: rgba(0, 0, 0, 0.58);" +
+			"-fx-background-radius: 22;" +
+			"-fx-padding: 20 42 20 42;"
+		);
+
+		skipButton.setStyle(
+			"-fx-background-color: rgba(255,255,255,0.22);" +
+			"-fx-text-fill: white;" +
+			"-fx-font-size: 18px;" +
+			"-fx-font-weight: bold;" +
+			"-fx-background-radius: 16;" +
+			"-fx-padding: 10 24 10 24;"
+		);
+
+		VBox noticeBox = new VBox(12, notice, skipButton);
+		noticeBox.setAlignment(Pos.CENTER);
+
+		StackPane.setAlignment(noticeBox, Pos.TOP_CENTER);
+		StackPane.setMargin(noticeBox, new Insets(30, 0, 0, 0));
+
+		appRoot.getChildren().add(noticeBox);
+
+		final int[] count = {10};
+
+		Timeline countdown = new Timeline(
+			new KeyFrame(Duration.seconds(1), e -> {
+				count[0]--;
+
+				if (count[0] > 0) {
+					notice.setText(count[0] + "초 후 시작됩니다");
+				} else {
+					appRoot.getChildren().remove(noticeBox);
+					newsPanel.startGame();
+				}
+			})
+		);
+
+		countdown.setCycleCount(10);
+
+		skipButton.setOnAction(e -> {
+			countdown.stop();
+			appRoot.getChildren().remove(noticeBox);
+			newsPanel.startGame();
+		});
+
+		countdown.play();
+	}
+
+	private void showGameOverDialog() {
+		Label icon = new Label("📈");
+		icon.setStyle("-fx-font-size: 52px;");
+
+		Label title = new Label("게임종료!");
+		title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 50));
+		title.setTextFill(Color.WHITE);
+
+		Label desc = new Label("20턴이 모두 종료되었습니다.\n최종 결과를 확인하거나 다시 도전할 수 있습니다.");
+		desc.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 21));
+		desc.setTextFill(Color.web("#DDE8FF"));
+		desc.setAlignment(Pos.CENTER);
+		desc.setStyle("-fx-text-alignment: center;");
+		desc.setWrapText(true);
+
+		Button retryBtn = new Button("재도전");
+		Button resultBtn = new Button("끝내기");
+
+		String btnStyle =
+			"-fx-background-color: rgba(255,255,255,0.22);" +
+			"-fx-text-fill: white;" +
+			"-fx-font-size: 21px;" +
+			"-fx-font-weight: bold;" +
+			"-fx-background-radius: 18;" +
+			"-fx-padding: 13 44 13 44;" +
+			"-fx-border-color: rgba(255,255,255,0.38);" +
+			"-fx-border-radius: 18;" +
+			"-fx-cursor: hand;";
+
+		retryBtn.setStyle(btnStyle);
+		resultBtn.setStyle(btnStyle);
+
+		HBox buttons = new HBox(20, retryBtn, resultBtn);
+		buttons.setAlignment(Pos.CENTER);
+
+		VBox card = new VBox(24, icon, title, desc, buttons);
+		card.setAlignment(Pos.CENTER);
+		card.setPadding(new Insets(52, 76, 52, 76));
+		card.setMaxWidth(680);
+		card.setStyle(
+			"-fx-background-color: linear-gradient(to bottom right," +
+				"rgba(6,18,74,0.95), rgba(91,0,110,0.92), rgba(155,0,92,0.88));" +
+			"-fx-background-radius: 36;" +
+			"-fx-border-color: rgba(255,255,255,0.42);" +
+			"-fx-border-radius: 36;" +
+			"-fx-border-width: 1.5;" +
+			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.70), 55, 0.35, 0, 0);"
+		);
+
+		StackPane overlay = new StackPane(card);
+		overlay.setStyle("-fx-background-color: rgba(0,0,0,0.62);");
+		overlay.setPrefSize(BASE_W, BASE_H);
+
+		appRoot.getChildren().add(overlay);
+
+		retryBtn.setOnAction(e -> {
+			appRoot.getChildren().remove(overlay);
+			restartGame();
+		});
+
+		resultBtn.setOnAction(e -> {
+			appRoot.getChildren().remove(overlay);
+			showFinalResultScreen();
+		});
+	}
+
+	private void showFinalResultScreen() {
+		Label title = new Label("최종 결과");
+		title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 54));
+		title.setTextFill(Color.WHITE);
+
+		Label result = new Label("투자가 종료되었습니다.\n최종 자산과 보유 주식을 확인하세요.");
+		result.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 24));
+		result.setTextFill(Color.web("#DDE8FF"));
+		result.setAlignment(Pos.CENTER);
+		result.setStyle("-fx-text-alignment: center;");
+		result.setWrapText(true);
+
+		VBox resultCard = new VBox(22, title, result);
+		resultCard.setAlignment(Pos.CENTER);
+		resultCard.setPadding(new Insets(50, 90, 50, 90));
+		resultCard.setMaxWidth(760);
+		resultCard.setStyle(
+			"-fx-background-color: rgba(0,0,0,0.30);" +
+			"-fx-background-radius: 34;" +
+			"-fx-border-color: rgba(255,255,255,0.35);" +
+			"-fx-border-radius: 34;" +
+			"-fx-border-width: 1.5;" +
+			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.55), 45, 0.35, 0, 0);"
+		);
+
+		Button exitBtn = new Button("종료");
+		exitBtn.setStyle(
+			"-fx-background-color: linear-gradient(to right, #ff416c, #ff4b2b);" +
+			"-fx-text-fill: white;" +
+			"-fx-font-size: 24px;" +
+			"-fx-font-weight: bold;" +
+			"-fx-background-radius: 22;" +
+			"-fx-padding: 15 70 15 70;" +
+			"-fx-cursor: hand;" +
+			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 14, 0.3, 0, 3);"
+		);
+
+		Region topSpace = new Region();
+		Region bottomSpace = new Region();
+		VBox.setVgrow(topSpace, Priority.ALWAYS);
+		VBox.setVgrow(bottomSpace, Priority.ALWAYS);
+
+		VBox screen = new VBox(30, topSpace, resultCard, bottomSpace, exitBtn);
+		screen.setAlignment(Pos.CENTER);
+		screen.setPadding(new Insets(70, 0, 70, 0));
+		screen.setStyle(
+			"-fx-background-color: linear-gradient(to bottom right, " +
+				"#06124A 0%, #1A0B5E 45%, #5B006E 75%, #9B005C 100%);"
+		);
+
+		StackPane resultOverlay = new StackPane(screen);
+		resultOverlay.setPrefSize(BASE_W, BASE_H);
+
+		appRoot.getChildren().add(resultOverlay);
+
+		exitBtn.setOnAction(e -> Platform.exit());
+	}
+
+	private void restartGame() {
+		if (bgmPlayer != null) {
+			bgmPlayer.stop();
+		}
+
+		Stage oldStage = currentStage;
+		Stage newStage = new Stage();
+
+		if (oldStage != null) {
+			oldStage.close();
+		}
+
+		try {
+			start(newStage);
+		} catch (Exception ex) {
+			ex.printStackTrace();
 		}
 	}
 
@@ -265,72 +476,15 @@ public class Main extends Application {
 			"-fx-effect: dropshadow(gaussian, rgba(255,50,50,0.45), 40, 0.3, 0, 0);"
 		);
 
-		// 오버레이 배경
-		javafx.scene.layout.StackPane overlay = new javafx.scene.layout.StackPane(card);
+		StackPane overlay = new StackPane(card);
 		overlay.setStyle("-fx-background-color: rgba(0,0,0,0.55);");
 
 		appRoot.getChildren().add(overlay);
 
 		closeBtn.setOnAction(e -> appRoot.getChildren().remove(overlay));
-		// 오버레이 클릭 시 닫기
 		overlay.setOnMouseClicked(e -> {
 			if (e.getTarget() == overlay) appRoot.getChildren().remove(overlay);
 		});
-	}
-
-	private void showStartNotice(NewsPanel newsPanel) {
-		Label notice = new Label("10초 후 시작됩니다");
-		Button skipButton = new Button("스킵");
-
-		notice.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 34));
-		notice.setTextFill(Color.WHITE);
-		notice.setStyle(
-			"-fx-background-color: rgba(0, 0, 0, 0.58);" +
-			"-fx-background-radius: 22;" +
-			"-fx-padding: 20 42 20 42;"
-		);
-
-		skipButton.setStyle(
-			"-fx-background-color: rgba(255,255,255,0.22);" +
-			"-fx-text-fill: white;" +
-			"-fx-font-size: 18px;" +
-			"-fx-font-weight: bold;" +
-			"-fx-background-radius: 16;" +
-			"-fx-padding: 10 24 10 24;"
-		);
-
-		VBox noticeBox = new VBox(12, notice, skipButton);
-		noticeBox.setAlignment(Pos.CENTER);
-
-		StackPane.setAlignment(noticeBox, Pos.TOP_CENTER);
-		StackPane.setMargin(noticeBox, new Insets(30, 0, 0, 0));
-
-		appRoot.getChildren().add(noticeBox);
-
-		final int[] count = {10};
-
-		Timeline countdown = new Timeline(
-			new KeyFrame(Duration.seconds(1), e -> {
-				count[0]--;
-
-				if (count[0] > 0) {
-					notice.setText(count[0] + "초 후 시작됩니다");
-				} else {
-					appRoot.getChildren().remove(noticeBox);
-					newsPanel.startGame();
-				}
-			})
-		);
-
-		countdown.setCycleCount(10);
-
-		skipButton.setOnAction(e -> {
-			countdown.stop();
-			appRoot.getChildren().remove(noticeBox);
-			newsPanel.startGame();
-		});
-
-		countdown.play();
 	}
 
 	private void showImageZoom(ImageView sourceImageView) {
@@ -389,44 +543,37 @@ public class Main extends Application {
 	}
 
 	private HBox buildTop(NewsPanel newsPanel) {
-		javafx.scene.image.Image logoImg = new javafx.scene.image.Image(
-			getClass().getResourceAsStream("images/logo.png")
-		);
-
-		javafx.scene.image.ImageView brand = new javafx.scene.image.ImageView(logoImg);
+		Image logoImg = new Image(getClass().getResourceAsStream("images/logo.png"));
+		ImageView brand = new ImageView(logoImg);
 		brand.setPreserveRatio(true);
 		brand.setFitHeight(56);
 
 		Region spacer = new Region();
 		HBox.setHgrow(spacer, Priority.ALWAYS);
 
-		Button fastForward = new Button("▶▶");
+		Button fastForward = new Button("SKIP ▶▶");
 		fastForward.setStyle(topButtonStyle());
 		fastForward.setOnAction(e -> newsPanel.nextTurn());
 
-		Image gearImg = new Image(
-			    getClass().getResourceAsStream("images/gear.png")
-			);
+		Image gearImg = new Image(getClass().getResourceAsStream("images/gear.png"));
+		ImageView gearView = new ImageView(gearImg);
+		gearView.setFitWidth(28);
+		gearView.setFitHeight(28);
 
-			ImageView gearView = new ImageView(gearImg);
+		Button optionButton = new Button();
+		optionButton.setGraphic(gearView);
+		optionButton.setStyle(
+			"-fx-background-color: rgba(255,255,255,0.15);" +
+			"-fx-background-radius: 50;" +
+			"-fx-min-width: 50;" +
+			"-fx-min-height: 50;" +
+			"-fx-max-width: 50;" +
+			"-fx-max-height: 50;" +
+			"-fx-cursor: hand;"
+		);
 
-			gearView.setFitWidth(28);
-			gearView.setFitHeight(28);
-			
-			Button optionButton = new Button();
-
-			optionButton.setGraphic(gearView);
-
-			optionButton.setStyle(
-			    "-fx-background-color: rgba(255,255,255,0.15);" +
-			    "-fx-background-radius: 50;" +
-			    "-fx-min-width: 50;" +
-			    "-fx-min-height: 50;" +
-			    "-fx-max-width: 50;" +
-			    "-fx-max-height: 50;" +
-			    "-fx-cursor: hand;"
-			);
 		optionButton.setOnAction(e -> showOptionWindow());
+
 		Button exitButton = new Button("종료");
 		exitButton.setStyle(
 			"-fx-background-color: linear-gradient(to right, #ff416c, #ff4b2b);" +
@@ -438,9 +585,9 @@ public class Main extends Application {
 			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 12, 0.3, 0, 3);"
 		);
 
-		exitButton.setOnAction(e -> currentStage.close());
+		exitButton.setOnAction(e -> Platform.exit());
 
-		HBox top = new HBox(12, brand, spacer, optionButton,fastForward,exitButton);
+		HBox top = new HBox(12, brand, spacer, optionButton, fastForward, exitButton);
 		top.setPadding(new Insets(0, 0, 14, 0));
 		top.setAlignment(Pos.CENTER_LEFT);
 
@@ -462,121 +609,223 @@ public class Main extends Application {
 		Stage stage = currentStage;
 		final double[] xOffset = {0};
 		final double[] yOffset = {0};
-	    Stage optionStage = new Stage();
-	    optionStage.initOwner(stage);
-	    optionStage.initModality(Modality.APPLICATION_MODAL);
-	    optionStage.initStyle(StageStyle.TRANSPARENT);
 
-	    Label title = new Label("설정");
-	    title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 30));
-	    title.setTextFill(Color.WHITE);
+		Stage optionStage = new Stage();
+		optionStage.initOwner(stage);
+		optionStage.initModality(Modality.APPLICATION_MODAL);
+		optionStage.initStyle(StageStyle.TRANSPARENT);
 
-	    Label volumeLabel = new Label("배경음악 볼륨");
-	    volumeLabel.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 16));
-	    volumeLabel.setTextFill(Color.WHITE);
+		Label title = new Label("설정");
+		title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 30));
+		title.setTextFill(Color.WHITE);
 
-	    Slider volumeSlider = new Slider(0, 100, bgmPlayer != null ? bgmPlayer.getVolume() * 100 : 30);
-	    volumeSlider.setPrefWidth(280);
-	    volumeSlider.setShowTickLabels(true);
-	    volumeSlider.setShowTickMarks(true);
+		Label volumeLabel = new Label("배경음악 볼륨");
+		volumeLabel.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 16));
+		volumeLabel.setTextFill(Color.WHITE);
 
-	    volumeSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
-	        if (bgmPlayer != null) {
-	            bgmPlayer.setVolume(newVal.doubleValue() / 100.0);
-	        }
-	    });
+		Slider volumeSlider = new Slider(
+				0,
+				100,
+				currentVolume * 100
+			);
+		volumeSlider.setPrefWidth(280);
+		volumeSlider.setShowTickLabels(true);
+		volumeSlider.setShowTickMarks(true);
 
-	    Label screenModeLabel = new Label("화면 모드");
-	    screenModeLabel.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 16));
-	    screenModeLabel.setTextFill(Color.WHITE);
+		volumeSlider.valueProperty().addListener((obs, oldVal, newVal) -> {
 
-	    ComboBox<String> screenModeBox = new ComboBox<>();
-	    screenModeBox.getItems().addAll("전체화면", "테두리 없음", "창모드");
-	    screenModeBox.setPrefWidth(280);
+			currentVolume = newVal.doubleValue() / 100.0;
 
-	    if (currentMode == DisplayMode.FULLSCREEN) {
-	        screenModeBox.setValue("전체화면");
-	    } else if (currentMode == DisplayMode.BORDERLESS) {
-	        screenModeBox.setValue("테두리 없음");
-	    } else {
-	        screenModeBox.setValue("창모드");
-	    }
+			if (bgmPlayer != null) {
+				bgmPlayer.setVolume(currentVolume);
+			}
+		});
+		Label screenModeLabel = new Label("화면 모드");
+		screenModeLabel.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 16));
+		screenModeLabel.setTextFill(Color.WHITE);
 
-	    Button applyButton = new Button("적용");
-	    Button closeButton = new Button("닫기");
+		ComboBox<String> screenModeBox = new ComboBox<>();
+		screenModeBox.getItems().addAll("전체화면", "테두리 없음", "창모드");
+		screenModeBox.setPrefWidth(280);
 
-	    String optionBtnStyle =
-	        "-fx-background-color: rgba(255,255,255,0.20);" +
-	        "-fx-text-fill: white;" +
-	        "-fx-font-size: 16px;" +
-	        "-fx-font-weight: bold;" +
-	        "-fx-background-radius: 16;" +
-	        "-fx-padding: 10 30 10 30;" +
-	        "-fx-border-color: rgba(255,255,255,0.35);" +
-	        "-fx-border-radius: 16;";
+		if (currentMode == DisplayMode.FULLSCREEN) {
+			screenModeBox.setValue("전체화면");
+		} else if (currentMode == DisplayMode.BORDERLESS) {
+			screenModeBox.setValue("테두리 없음");
+		} else {
+			screenModeBox.setValue("창모드");
+		}
 
-	    applyButton.setStyle(optionBtnStyle);
-	    closeButton.setStyle(optionBtnStyle);
+		Button applyButton = new Button("적용");
+		Button closeButton = new Button("닫기");
 
-	    applyButton.setOnAction(e -> {
-	        optionStage.close();
+		String optionBtnStyle =
+			"-fx-background-color: rgba(255,255,255,0.20);" +
+			"-fx-text-fill: white;" +
+			"-fx-font-size: 16px;" +
+			"-fx-font-weight: bold;" +
+			"-fx-background-radius: 16;" +
+			"-fx-padding: 10 30 10 30;" +
+			"-fx-border-color: rgba(255,255,255,0.35);" +
+			"-fx-border-radius: 16;";
 
-	        String mode = screenModeBox.getValue();
+		applyButton.setStyle(optionBtnStyle);
+		closeButton.setStyle(optionBtnStyle);
 
-	        if (mode.equals("전체화면")) {
-	        	applyDisplayMode(DisplayMode.FULLSCREEN);
-	        }
-	        else if (mode.equals("테두리 없음")) {
-	        	applyDisplayMode(DisplayMode.BORDERLESS);
-	        }
-	        else if (mode.equals("창모드")) {
-	        	applyDisplayMode(DisplayMode.WINDOWED);
-	        }
-	    });
+		Label musicLabel = new Label("배경음악");
 
-	    closeButton.setOnAction(e -> optionStage.close());
+		musicLabel.setFont(
+			Font.font(
+				uiFontFamily,
+				FontWeight.BOLD,
+				16
+			)
+		);
 
-	    HBox buttons = new HBox(12, applyButton, closeButton);
-	    buttons.setAlignment(Pos.CENTER);
+		musicLabel.setTextFill(Color.WHITE);
 
-	    VBox card = new VBox(
-	    	   22,
-	    	   title,
-	    	   volumeLabel,
-	    	   volumeSlider,
-	    	   screenModeLabel,
-	    	   screenModeBox,
-	    	   buttons
-	    );
-	    card.setAlignment(Pos.CENTER);
-	    card.setPadding(new Insets(34));
+		ComboBox<String> musicBox = new ComboBox<>();
 
-	    card.setStyle(
-	        "-fx-background-color: linear-gradient(to bottom right, " +
-	            "rgba(6,18,74,0.78), " +
-	            "rgba(91,0,110,0.72), " +
-	            "rgba(155,0,92,0.68));" +
-	        "-fx-background-radius: 30;" +
-	        "-fx-border-color: rgba(255,255,255,0.32);" +
-	        "-fx-border-radius: 30;" +
-	        "-fx-border-width: 1.5;" 
-	    );
-	    card.setOnMousePressed(e -> {
-	        xOffset[0] = e.getSceneX();
-	        yOffset[0] = e.getSceneY();
-	    });
+		musicBox.getItems().addAll(
+			"connect sky-2",
+			"connect sky",
+			"브금1",
+			"브금2",
+			"브금3",
+			"브금4"
+		);
 
-	    card.setOnMouseDragged(e -> {
-	        optionStage.setX(e.getScreenX() - xOffset[0]);
-	        optionStage.setY(e.getScreenY() - yOffset[0]);
-	    });
-	    Scene scene = new Scene(card, 420, 330);
-	    scene.setFill(Color.TRANSPARENT);
+		if (currentMusic.equals("/music/main_bgm.mp3")) {
+			musicBox.setValue("connect sky");
+		}
+		else if (currentMusic.equals("/music/calm.mp3")) {
+			musicBox.setValue("connect sky-2");
+		}
+		else if (currentMusic.equals("/music/bull.mp3")) {
+			musicBox.setValue("브금1");
+		}
+		else if (currentMusic.equals("/music/B2.mp3")) {
+			musicBox.setValue("브금2");
+		}
+		else if (currentMusic.equals("/music/B3.mp3")) {
+			musicBox.setValue("브금3");
+		}
+		else if (currentMusic.equals("/music/B4.mp3")) {
+			musicBox.setValue("브금4");
+		}
+		else {
+			musicBox.setValue("connect sky-2");
+		}
+		musicBox.setPrefWidth(280);
+		applyButton.setOnAction(e -> {
+			optionStage.close();
+		
 
-	    optionStage.setScene(scene);
-	    optionStage.show();
-	    
+			String music = musicBox.getValue();
+
+			String oldMusic = currentMusic;
+
+			switch (music) {
+
+				case "connect sky":
+					currentMusic = "/music/main_bgm.mp3";
+					break;
+
+				case "connect sky-2":
+					currentMusic = "/music/calm.mp3";
+					break;
+
+				case "브금1":
+					currentMusic = "/music/bull.mp3";
+					break;
+
+				case "브금2":
+					currentMusic = "/music/B2.mp3";
+					break;
+
+				case "브금3":
+					currentMusic = "/music/B3.mp3";
+					break;
+					
+				case "브금4":
+					currentMusic = "/music/B4.mp3";
+					break;
+					
+			}
+
+			if (!oldMusic.equals(currentMusic)) {
+				playBgm();
+			}
+			
+			String mode = screenModeBox.getValue();
+
+			DisplayMode newMode;
+
+			if (mode.equals("전체화면")) {
+			    newMode = DisplayMode.FULLSCREEN;
+			}
+			else if (mode.equals("테두리 없음")) {
+			    newMode = DisplayMode.BORDERLESS;
+			}
+			else {
+			    newMode = DisplayMode.WINDOWED;
+			}
+
+			if (newMode != currentMode) {
+			    applyDisplayMode(newMode);
+			}
+		});
+	
+		closeButton.setOnAction(e -> optionStage.close());
+
+		HBox buttons = new HBox(12, applyButton, closeButton);
+		buttons.setAlignment(Pos.CENTER);
+
+		VBox card = new VBox(
+			22,
+			title,
+			volumeLabel,
+			volumeSlider,
+			musicLabel,
+			musicBox,
+			screenModeLabel,
+			screenModeBox,
+			buttons
+		);
+
+		card.setAlignment(Pos.CENTER);
+		card.setPadding(new Insets(34));
+
+		card.setStyle(
+			"-fx-background-color: linear-gradient(to bottom right, " +
+				"rgba(6,18,74,0.78), " +
+				"rgba(91,0,110,0.72), " +
+				"rgba(155,0,92,0.68));" +
+			"-fx-background-radius: 30;" +
+			"-fx-border-color: rgba(255,255,255,0.32);" +
+			"-fx-border-radius: 30;" +
+			"-fx-border-width: 1.5;"
+		);
+
+		card.setOnMousePressed(e -> {
+			xOffset[0] = e.getSceneX();
+			yOffset[0] = e.getSceneY();
+		});
+
+		card.setOnMouseDragged(e -> {
+			optionStage.setX(e.getScreenX() - xOffset[0]);
+			optionStage.setY(e.getScreenY() - yOffset[0]);
+		});
+		
+
+
+		Scene scene = new Scene(card, 420, 400);
+		scene.setFill(Color.TRANSPARENT);
+
+		optionStage.setScene(scene);
+		optionStage.show();
 	}
+
 	private void updateResponsiveScale() {
 		if (responsiveRoot == null || scaledGroup == null || uiScale == null) return;
 
@@ -585,8 +834,6 @@ public class Main extends Application {
 
 		if (w <= 0 || h <= 0) return;
 
-		// 1920x1080 기준으로 만든 UI를 현재 화면 안에 반드시 들어오도록 축소/확대한다.
-		// 핵심: Scale의 pivot을 (0,0)으로 고정해야 아래로 밀리거나 클릭 위치가 어긋나지 않는다.
 		double scale = Math.min(w / BASE_W, h / BASE_H);
 
 		uiScale.setX(scale);
@@ -595,7 +842,6 @@ public class Main extends Application {
 		double scaledW = BASE_W * scale;
 		double scaledH = BASE_H * scale;
 
-		// 남는 공간은 중앙 정렬한다. 화면 비율이 달라도 UI가 잘리지 않는다.
 		scaledGroup.setLayoutX(Math.max(0, (w - scaledW) / 2.0));
 		scaledGroup.setLayoutY(Math.max(0, (h - scaledH) / 2.0));
 	}
@@ -669,11 +915,12 @@ public class Main extends Application {
 			newStage.setAlwaysOnTop(true);
 
 			Platform.runLater(() -> {
-			    newStage.setAlwaysOnTop(false);
-			    updateResponsiveScale();
+				newStage.setAlwaysOnTop(false);
+				updateResponsiveScale();
 			});
 		}
 	}
+
 	private Screen getCurrentScreen(Stage stage) {
 		if (stage == null) {
 			return Screen.getPrimary();
@@ -683,7 +930,7 @@ public class Main extends Application {
 		double centerY = stage.getY() + stage.getHeight() / 2;
 
 		for (Screen screen : Screen.getScreens()) {
-		    Rectangle2D bounds = screen.getBounds();
+			Rectangle2D bounds = screen.getBounds();
 
 			if (centerX >= bounds.getMinX() &&
 				centerX <= bounds.getMaxX() &&
@@ -695,24 +942,22 @@ public class Main extends Application {
 
 		return Screen.getPrimary();
 	}
+
 	private HBox buildCenter(NewsPanel newsPanel, ChartPanel chartPanel) {
 		OrderPanel order = new OrderPanel(370, BOTTOM_H);
 		orderRef = order;
 		WalletPanel wallet = new WalletPanel(370, BOTTOM_H);
 		StockListPanel stockList = new StockListPanel(520, COLUMN_H);
+
 		stockListRef = stockList;
 		walletRef = wallet;
 
 		order.setWallet(wallet);
 		stockList.setChartPanel(chartPanel);
 
-		// ── 상장폐지 이벤트 처리 ──
 		stockList.setOnDelisted(name -> {
-			// ChartPanel에 상장폐지 마킹 (이후 캔들 추가 차단)
 			chartPanel.delistStock(name);
-			// 지갑에서 해당 종목 강제 소각 (현금 환급 없음)
 			long lost = walletRef.delistStock(name);
-			// 상장폐지 안내 팝업
 			showDelistNotice(name, lost);
 		});
 
