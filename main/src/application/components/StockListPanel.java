@@ -380,7 +380,9 @@ public class StockListPanel extends VBox {
         applyRowSelectedStyle(row);
 
         if (onStockSelected != null) {
-            onStockSelected.accept(name, price);
+            // 행 생성 시 캡처된 price 대신 stocks 맵에서 최신 가격을 조회
+            long latestPrice = stocks.getOrDefault(name, price);
+            onStockSelected.accept(name, latestPrice);
         }
     }
 
