@@ -573,7 +573,7 @@ public class Main extends Application {
 			ex.printStackTrace();
 		}
 	}
-	private void showFinalResultScreen() {
+	private void ShowFinalResultScreen() {
 		Label title = new Label("🎮 게임 종료 - 최종 투자 결과");
 		title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 46));
 		title.setTextFill(Color.WHITE);
