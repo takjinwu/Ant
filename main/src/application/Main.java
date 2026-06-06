@@ -42,6 +42,9 @@ import javafx.scene.image.Image;
 import javafx.scene.transform.Scale;
 import javafx.stage.Screen;
 import javafx.geometry.Rectangle2D;
+import javafx.scene.control.Button;
+import javafx.scene.effect.DropShadow;
+import javafx.scene.paint.Color;
 
 public class Main extends Application {
 
@@ -179,7 +182,7 @@ public class Main extends Application {
 				if (stockListRef != null) stockListRef.selectFirst();
 			});
 
-			showStartNotice(newsPanel);
+			showStartScreen(newsPanel);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -218,59 +221,60 @@ public class Main extends Application {
 		}
 	}
 
-	private void showStartNotice(NewsPanel newsPanel) {
-		Label notice = new Label("10초 후 시작됩니다");
-		Button skipButton = new Button("SKIP ▶▶");
+	private void showStartScreen(NewsPanel newsPanel) {
+		Label title = new Label("개미증권");
+		title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 58));
+		title.setTextFill(Color.WHITE);
 
-		notice.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 34));
-		notice.setTextFill(Color.WHITE);
-		notice.setStyle(
-			"-fx-background-color: rgba(0, 0, 0, 0.58);" +
-			"-fx-background-radius: 22;" +
-			"-fx-padding: 20 42 20 42;"
+		Label desc = new Label(
+			"뉴스를 확인하고 주식을 매수·매도하여\n" +
+			"20턴 동안 최대한 높은 자산을 만들어보세요.\n\n" +
+			"뉴스는 1분마다 자동으로 변경되며,\n" +
+			"SKIP 버튼으로 바로 다음 턴으로 넘길 수 있습니다."
 		);
+		desc.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 22));
+		desc.setTextFill(Color.web("#DDE8FF"));
+		desc.setAlignment(Pos.CENTER);
+		desc.setStyle("-fx-text-alignment: center;");
+		desc.setWrapText(true);
 
-		skipButton.setStyle(
-			"-fx-background-color: rgba(255,255,255,0.22);" +
+		Button startBtn = new Button("게임 시작");
+		applyHoverEffect(startBtn);
+		startBtn.setStyle(
+			"-fx-background-color: linear-gradient(to right, #00C6FF, #7F00FF);" +
 			"-fx-text-fill: white;" +
-			"-fx-font-size: 18px;" +
+			"-fx-font-size: 26px;" +
 			"-fx-font-weight: bold;" +
-			"-fx-background-radius: 16;" +
-			"-fx-padding: 10 24 10 24;"
+			"-fx-background-radius: 24;" +
+			"-fx-padding: 16 70 16 70;" +
+			"-fx-cursor: hand;" +
+			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.45), 18, 0.35, 0, 4);"
 		);
 
-		VBox noticeBox = new VBox(12, notice, skipButton);
-		noticeBox.setAlignment(Pos.CENTER);
-
-		StackPane.setAlignment(noticeBox, Pos.TOP_CENTER);
-		StackPane.setMargin(noticeBox, new Insets(30, 0, 0, 0));
-
-		appRoot.getChildren().add(noticeBox);
-
-		final int[] count = {10};
-
-		Timeline countdown = new Timeline(
-			new KeyFrame(Duration.seconds(1), e -> {
-				count[0]--;
-
-				if (count[0] > 0) {
-					notice.setText(count[0] + "초 후 시작됩니다");
-				} else {
-					appRoot.getChildren().remove(noticeBox);
-					newsPanel.startGame();
-				}
-			})
+		VBox card = new VBox(30, title, desc, startBtn);
+		card.setAlignment(Pos.CENTER);
+		card.setPadding(new Insets(58, 90, 58, 90));
+		card.setMaxWidth(760);
+		card.setStyle(
+			"-fx-background-color: linear-gradient(to bottom right," +
+				"rgba(6,18,74,0.94), rgba(91,0,110,0.90), rgba(155,0,92,0.86));" +
+			"-fx-background-radius: 38;" +
+			"-fx-border-color: rgba(255,255,255,0.42);" +
+			"-fx-border-radius: 38;" +
+			"-fx-border-width: 1.5;" +
+			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.68), 55, 0.35, 0, 0);"
 		);
 
-		countdown.setCycleCount(10);
+		StackPane overlay = new StackPane(card);
+		overlay.setStyle("-fx-background-color: rgba(0,0,0,0.58);");
+		overlay.setPrefSize(BASE_W, BASE_H);
 
-		skipButton.setOnAction(e -> {
-			countdown.stop();
-			appRoot.getChildren().remove(noticeBox);
+		appRoot.getChildren().add(overlay);
+
+		startBtn.setOnAction(e -> {
+			appRoot.getChildren().remove(overlay);
 			newsPanel.startGame();
 		});
-
-		countdown.play();
 	}
 
 	private void showGameOverDialog() {
@@ -290,7 +294,8 @@ public class Main extends Application {
 
 		Button retryBtn = new Button("재도전");
 		Button resultBtn = new Button("끝내기");
-
+		applyHoverEffect(retryBtn);
+		applyHoverEffect(resultBtn);
 		String btnStyle =
 			"-fx-background-color: rgba(255,255,255,0.22);" +
 			"-fx-text-fill: white;" +
@@ -365,6 +370,7 @@ public class Main extends Application {
 		);
 
 		Button exitBtn = new Button("종료");
+		applyHoverEffect(exitBtn);
 		exitBtn.setStyle(
 			"-fx-background-color: linear-gradient(to right, #ff416c, #ff4b2b);" +
 			"-fx-text-fill: white;" +
@@ -451,6 +457,7 @@ public class Main extends Application {
 		}
 
 		Button closeBtn = new Button("확인");
+		applyHoverEffect(closeBtn);
 		closeBtn.setStyle(
 			"-fx-background-color: rgba(255,85,85,0.75);" +
 			"-fx-text-fill: white;" +
@@ -584,7 +591,9 @@ public class Main extends Application {
 			"-fx-padding: 10 26 10 26;" +
 			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 12, 0.3, 0, 3);"
 		);
-
+		applyHoverEffect(exitButton);
+		applyHoverEffect(optionButton);
+		applyHoverEffect(fastForward);
 		exitButton.setOnAction(e -> Platform.exit());
 
 		HBox top = new HBox(12, brand, spacer, optionButton, fastForward, exitButton);
@@ -658,6 +667,8 @@ public class Main extends Application {
 
 		Button applyButton = new Button("적용");
 		Button closeButton = new Button("닫기");
+		applyHoverEffect(applyButton);
+		applyHoverEffect(closeButton);
 
 		String optionBtnStyle =
 			"-fx-background-color: rgba(255,255,255,0.20);" +
@@ -994,7 +1005,29 @@ public class Main extends Application {
 
 		return left;
 	}
+	private void applyHoverEffect(Button button) {
 
+		button.setOnMouseEntered(e -> {
+
+			button.setScaleX(1.04);
+			button.setScaleY(1.04);
+
+			button.setEffect(
+				new DropShadow(
+					18,
+					Color.rgb(255, 255, 255, 0.25)
+				)
+			);
+		});
+
+		button.setOnMouseExited(e -> {
+
+			button.setScaleX(1.0);
+			button.setScaleY(1.0);
+
+			button.setEffect(null);
+		});
+	}
 	public static void main(String[] args) {
 		launch(args);
 	}
