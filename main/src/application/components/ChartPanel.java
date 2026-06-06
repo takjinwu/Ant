@@ -302,10 +302,12 @@ public class ChartPanel extends VBox {
         double[] last = data[data.length - 1];
         double prevClose = last[3];
 
-        // effect를 ±% 드리프트로 변환 (최대 ±10% 수준)
+        // effect를 ±% 드리프트로 변환 — 뉴스 강도에 비례하되 과도하지 않게
         java.util.Random r = new java.util.Random();
-        double bias   = effect * 0.004;                          // effect 10 → +4% 편향
-        double drift  = bias + (r.nextDouble() - 0.5) * 0.04;   // 랜덤 노이즈 ±2%
+        // effect 100 → +10% 편향. 이전 값(0.004)은 effect 70만 돼도 ±30% 상한가에
+        // 항상 도달해 등락률이 고정되고 너무 극단적이었음.
+        double bias   = effect * 0.001;
+        double drift  = bias + (r.nextDouble() - 0.5) * 0.04;   // 랜덤 노이즈 ±2% → 등락률에 변동성 부여
         double open   = prevClose;
         double close  = open * (1 + drift);
 
@@ -343,10 +345,14 @@ public class ChartPanel extends VBox {
      * 턴이 넘어갈 때 호출 — stocksMap에 있는 모든 종목의 캐시 데이터에 새 캔들을 추가합니다.
      * 아직 한 번도 클릭하지 않은 종목도 미리 초기화하여 캔들을 누적합니다.
      *
-     * @param stocksMap 종목명 → 초기가격 맵 (StockListPanel.getStocks() 에서 전달)
-     * @param effect    뉴스 효과 (정수 %)
+     * 종목마다 effect 가 다를 수 있다 — 뉴스가 영향을 주는 섹터의 종목은 크게,
+     * 무관한 종목은 0(±랜덤 노이즈만)으로 움직여 "오르는 종목/내리는 종목"이 갈린다.
+     *
+     * @param stocksMap     종목명 → 초기가격 맵 (StockListPanel.getStocks() 에서 전달)
+     * @param effectByStock 종목명 → 뉴스 효과(정수 %). 없는 종목은 0으로 처리.
      */
-    public void addCandleToAll(java.util.Map<String, Long> stocksMap, int effect) {
+    public void addCandleToAll(java.util.Map<String, Long> stocksMap,
+                               java.util.Map<String, Integer> effectByStock) {
         java.util.Random r = new java.util.Random();
 
         for (java.util.Map.Entry<String, Long> entry : stocksMap.entrySet()) {
@@ -356,14 +362,19 @@ public class ChartPanel extends VBox {
             // ── 상장폐지 종목은 캔들 추가 안 함 ──
             if (delistedStocks.contains(name)) continue;
 
+            // 종목별 뉴스 효과 (관련 없는 종목은 0 → 노이즈만)
+            int effect = (effectByStock != null)
+                    ? effectByStock.getOrDefault(name, 0)
+                    : 0;
+
             // 캐시에 없으면 초기 시리즈 생성
             double[][] stockData = dataCache.computeIfAbsent(name, k -> generateSeries(k, price));
 
             double[] last      = stockData[stockData.length - 1];
             double   prevClose = last[3];
 
-            double bias  = effect * 0.004;
-            double drift = bias + (r.nextDouble() - 0.5) * 0.04;
+            double bias  = effect * 0.001;   // effect 100 → +10% (이전 0.004는 항상 ±30%에 도달해 극단적)
+            double drift = bias + (r.nextDouble() - 0.5) * 0.04;   // ±2% 랜덤 노이즈로 등락률 변동
             double open  = prevClose;
             double close = open  * (1 + drift);
 
