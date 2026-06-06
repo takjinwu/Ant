@@ -1051,7 +1051,7 @@ public class Main extends Application {
 			musicBox.setValue("브금4");
 		}
 		else if (currentMusic.equals("/music/B5.mp3")) {
-			musicBox.setValue("브금4");
+			musicBox.setValue("Underwater city");
 		}
 		else {
 			musicBox.setValue("connect sky-2");
