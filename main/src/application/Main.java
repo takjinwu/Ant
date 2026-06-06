@@ -55,7 +55,7 @@ public class Main extends Application {
 	private static final double BOTTOM_H = 260;
 	private static final double GAP = 18;
 	private static final double COLUMN_H = CHART_H + GAP + BOTTOM_H;
-	private double currentVolume = 0.5;
+	private double currentVolume = 0.3;
 	private StackPane appRoot;
 	private Pane responsiveRoot;
 	private Group scaledGroup;
@@ -692,7 +692,8 @@ public class Main extends Application {
 			"브금1",
 			"브금2",
 			"브금3",
-			"브금4"
+			"브금4",
+			"Underwater city"
 		);
 
 		if (currentMusic.equals("/music/main_bgm.mp3")) {
@@ -711,6 +712,9 @@ public class Main extends Application {
 			musicBox.setValue("브금3");
 		}
 		else if (currentMusic.equals("/music/B4.mp3")) {
+			musicBox.setValue("브금4");
+		}
+		else if (currentMusic.equals("/music/B5.mp3")) {
 			musicBox.setValue("브금4");
 		}
 		else {
@@ -749,6 +753,10 @@ public class Main extends Application {
 					
 				case "브금4":
 					currentMusic = "/music/B4.mp3";
+					break;
+					
+				case "Underwater city":
+					currentMusic = "/music/B5.mp3";
 					break;
 					
 			}
