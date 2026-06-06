@@ -37,7 +37,7 @@ public class ChartPanel extends VBox {
     private static final int PAD_R = 6;
     private static final double VOL_RATIO = 0.22;
     private static final double HEAD_H = 72;
-    private static final int VISIBLE_CANDLES = 30;  // 화면에 표시할 최대 캔들 수
+    private static final int VISIBLE_CANDLES = 24;  // 화면에 표시할 최대 캔들 수
     private static final double LIMIT_RATE = 0.30;  // 상한가/하한가 ±30%
 
     private static final double[][] SAMPLE_SERIES = {
