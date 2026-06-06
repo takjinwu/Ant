@@ -263,7 +263,12 @@ public class StockListPanel extends VBox {
         trendDot.setEffect(new DropShadow(8, trendColor));
 
         Label nameLabel = new Label(name);
-        nameLabel.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 16));
+        // 폰트는 setFont() 대신 인라인 스타일로 지정한다.
+        // setFont() 값은 스타일시트(.label / .root)의 -fx-font-family 와 충돌해,
+        // hover/클릭으로 row.setStyle() 이 호출돼 CSS가 재적용될 때마다
+        // 폰트가 다시 계산(재해석)되며 크기가 들쭉날쭉해진다.
+        // 인라인 스타일은 우선순위가 가장 높아 재적용돼도 크기가 고정된다.
+        nameLabel.setStyle("-fx-font-family: 'SUIT'; -fx-font-weight: bold; -fx-font-size: 16px;");
         nameLabel.setTextFill(Color.web("#E0E8FF"));
 
         Region spacer = new Region();
@@ -274,7 +279,8 @@ public class StockListPanel extends VBox {
         String bgColor  = bull ? "rgba(232,83,74,0.15)" : "rgba(74,158,255,0.15)";
 
         Label priceLabel = new Label(formatMoney(price) + " 원");
-        priceLabel.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 16));
+        // nameLabel과 동일하게 인라인 스타일로 폰트 고정 (색상만 setTextFill 로 동적 변경)
+        priceLabel.setStyle("-fx-font-family: 'SUIT'; -fx-font-weight: bold; -fx-font-size: 16px;");
         priceLabel.setTextFill(Color.web(colorHex));
 
         Label changeLabel = new Label("+0.00%");
@@ -295,6 +301,9 @@ public class StockListPanel extends VBox {
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(12, 14, 12, 14));
         row.setUserData(name);
+        // 카드(행) 높이를 콘텐츠 기준으로 고정해 hover/클릭 시 절대 늘어나지 않게 한다.
+        row.setMinHeight(Region.USE_PREF_SIZE);
+        row.setMaxHeight(Region.USE_PREF_SIZE);
         applyRowStyle(row, false);
 
         row.setOnMouseEntered(e -> {
@@ -325,6 +334,9 @@ public class StockListPanel extends VBox {
             row.setStyle(
                 "-fx-background-color: rgba(120,30,30,0.18);" +
                 "-fx-background-radius: 12;" +
+                "-fx-border-color: transparent;" +
+                "-fx-border-radius: 12;" +
+                "-fx-border-width: 1.2;" +
                 "-fx-cursor: default;" +
                 "-fx-opacity: 0.62;"
             );
@@ -344,7 +356,8 @@ public class StockListPanel extends VBox {
             Label changeLabel = (Label) rightBox.getChildren().get(1);
 
             priceLabel.setText("상장폐지");
-            priceLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
+            // 인라인 폰트 스타일과 충돌하지 않도록 setFont 대신 setStyle 사용
+            priceLabel.setStyle("-fx-font-family: 'SUIT'; -fx-font-weight: bold; -fx-font-size: 13px;");
             priceLabel.setTextFill(Color.web("#FF5555"));
 
             changeLabel.setText("거래정지");
@@ -401,14 +414,20 @@ public class StockListPanel extends VBox {
     }
 
     private void applyRowStyle(HBox row, boolean hover) {
+        // 테두리 두께(1.2)를 항상 동일하게 유지하고 색만 투명으로 둔다.
+        // → 선택/호버 상태와 insets(레이아웃 크기)가 같아져 카드 크기가 변하지 않는다.
         row.setStyle(
             "-fx-background-color: rgba(255,255,255," + (hover ? "0.12" : "0.06") + ");" +
             "-fx-background-radius: 12;" +
+            "-fx-border-color: transparent;" +
+            "-fx-border-radius: 12;" +
+            "-fx-border-width: 1.2;" +
             "-fx-cursor: hand;"
         );
     }
 
     private void applyRowSelectedStyle(HBox row) {
+        // applyRowStyle 와 동일한 테두리 두께(1.2)를 사용해 크기 변화를 없앤다. 색만 강조색으로.
         row.setStyle(
             "-fx-background-color: rgba(126,221,255,0.20);" +
             "-fx-background-radius: 12;" +
