@@ -36,7 +36,7 @@ public class NewsPanel extends Pane {
 
 	private int turn = 0;
 	private int currentEffect = 0;
-	private int elapsedSeconds = 0;
+	private int remainingSeconds = 60;
 	private int lastIndex = -1;
 
 	private boolean gameStarted = false;
@@ -273,37 +273,42 @@ public class NewsPanel extends Pane {
 		if (gameStarted) {
 			return;
 		}
-		gameEnded = false;
-		usedNews.clear();
+
 		gameStarted = true;
-		elapsedSeconds = 0;
-		turn = 0;
-		lastIndex = -1;
+		remainingSeconds = 60;
+		timeLabel.setText("01:00");
 
-		timeLabel.setText("00:00");
-		turnLabel.setText("TURN 0");
-
-		startClock();
 		nextTurn();
-		startNewsTimer();
+		startClock();
 	}
 
 	private void startClock() {
+		if (clockTimer != null) {
+			clockTimer.stop();
+		}
+
 		clockTimer = new Timeline(
-				new KeyFrame(Duration.seconds(1), e -> {
-					elapsedSeconds++;
+			new KeyFrame(Duration.seconds(1), e -> {
+				remainingSeconds--;
 
-					int minutes = elapsedSeconds / 60;
-					int seconds = elapsedSeconds % 60;
-
-					timeLabel.setText(String.format("%02d:%02d", minutes, seconds));
-				})
+				if (remainingSeconds <= 0) {
+					nextTurn();
+				} else {
+					updateTimeLabel();
+				}
+			})
 		);
 
 		clockTimer.setCycleCount(Timeline.INDEFINITE);
 		clockTimer.play();
 	}
+	
+	private void updateTimeLabel() {
+		int minutes = remainingSeconds / 60;
+		int seconds = remainingSeconds % 60;
 
+		timeLabel.setText(String.format("%02d:%02d", minutes, seconds));
+	}
 	private void startNewsTimer() {
 		newsTimer = new Timeline(
 				new KeyFrame(Duration.minutes(1), e -> nextTurn())
@@ -347,6 +352,8 @@ public class NewsPanel extends Pane {
 
 		turn++;
 		turnLabel.setText("TURN " + turn);
+		remainingSeconds = 60;
+		updateTimeLabel();
 
 		NewsItem item = getRandomNews();
 
@@ -416,7 +423,6 @@ public class NewsPanel extends Pane {
 	}
 	public void resetGame() {
 	    turn = 0;
-	    elapsedSeconds = 0;
 	    gameEnded = false;
 	    gameStarted = false;
 
