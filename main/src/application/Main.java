@@ -381,39 +381,154 @@ public class Main extends Application {
 	}
 
 	private void showFinalResultScreen() {
-		Label title = new Label("최종 결과");
-		title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 54));
+		Label title = new Label("🎮 게임 종료 - 최종 투자 결과");
+		title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 46));
 		title.setTextFill(Color.WHITE);
 
-		Label result = new Label("투자가 종료되었습니다.\n최종 자산과 보유 주식을 확인하세요.");
-		result.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 24));
-		result.setTextFill(Color.web("#DDE8FF"));
-		result.setAlignment(Pos.CENTER);
-		result.setStyle("-fx-text-alignment: center;");
-		result.setWrapText(true);
+		// 1. 자산 및 수익률 계산
+		long initialAsset = 10_000_000L; // 게임 시작 시 초기 자산 (1천만 원)
+		long currentCash = walletRef.getCash();
+		long totalStockValue = 0L;
 
-		VBox resultCard = new VBox(22, title, result);
+		// WalletPanel로부터 현재 보유 주식 목록을 가져와 현재가 기준으로 총액 계산
+		java.util.Map<String, int[]> currentHoldings = walletRef.getHoldings();
+		for (java.util.Map.Entry<String, int[]> entry : currentHoldings.entrySet()) {
+			String stockName = entry.getKey();
+			int quantity = entry.getValue()[0];
+			// 실시간 현재가를 가져오고, 없을 경우 평단가로 예외 처리
+			long currentPrice = (stockListRef != null) ? stockListRef.getPrice(stockName) : entry.getValue()[1];
+			totalStockValue += (long) quantity * currentPrice;
+		}
+
+		long finalTotalAsset = currentCash + totalStockValue;
+		long profitOrLoss = finalTotalAsset - initialAsset;
+		double profitRate = ((double) profitOrLoss / initialAsset) * 100.0;
+
+		// 2. 총자산 정보 레이아웃 구성
+		Label totalAssetLabel = new Label(String.format("최종 총 자산: %,d 원", finalTotalAsset));
+		totalAssetLabel.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 26));
+		totalAssetLabel.setTextFill(Color.web("#7EDDFF"));
+
+		Label detailsLabel = new Label(String.format("(현금: %,d 원 | 주식 평가액: %,d 원)", currentCash, totalStockValue));
+		detailsLabel.setFont(Font.font(uiFontFamily, FontWeight.NORMAL, 15));
+		detailsLabel.setTextFill(Color.web("#AAB4D4"));
+
+		// 3. 수익률 퍼센트 표시 (이득: 빨강 ▲ / 손해: 파랑 ▼)
+		Label rateLabel = new Label();
+		if (profitOrLoss > 0) {
+			rateLabel.setText(String.format("수익률: ▲+%.2f%% (+%,d 원)", profitRate, profitOrLoss));
+			rateLabel.setTextFill(Color.web("#FF5555")); // 상승 레드
+		} else if (profitOrLoss < 0) {
+			rateLabel.setText(String.format("수익률: ▼%.2f%% (%,d 원)", profitRate, profitOrLoss));
+			rateLabel.setTextFill(Color.web("#5599FF")); // 하락 블루
+		} else {
+			rateLabel.setText("수익률: 0.00% (변동 없음)");
+			rateLabel.setTextFill(Color.WHITE);
+		}
+		rateLabel.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 28));
+
+		VBox assetSummaryBox = new VBox(8, totalAssetLabel, detailsLabel, rateLabel);
+		assetSummaryBox.setAlignment(Pos.CENTER);
+		assetSummaryBox.setPadding(new Insets(15));
+		assetSummaryBox.setStyle("-fx-background-color: rgba(255,255,255,0.05); -fx-background-radius: 16;");
+
+		// 4. 보유 주식 명세서 리스트 생성
+		Label holdingTitle = new Label("📋 최종 보유 주식 내역");
+		holdingTitle.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 18));
+		holdingTitle.setTextFill(Color.web("#FFE5A3"));
+
+		VBox holdingListContainer = new VBox(8);
+		holdingListContainer.setPadding(new Insets(10));
+
+		if (currentHoldings.isEmpty()) {
+			Label noHolding = new Label("종료 시점에 보유한 주식이 없습니다.");
+			noHolding.setFont(Font.font(uiFontFamily, 15));
+			noHolding.setTextFill(Color.web("#8899BB"));
+			holdingListContainer.getChildren().add(noHolding);
+		} else {
+			// 헤더 행 추가
+			HBox rowHeader = new HBox(10);
+			Label hName = new Label("종목명");   hName.setPrefWidth(140);  hName.setTextFill(Color.web("#AAB4D4"));
+			Label hQty  = new Label("보유량");   hQty.setPrefWidth(80);    hQty.setTextFill(Color.web("#AAB4D4"));
+			Label hAvg  = new Label("평균단가"); hAvg.setPrefWidth(110);   hAvg.setTextFill(Color.web("#AAB4D4"));
+			Label hCur  = new Label("현재가");   hCur.setPrefWidth(110);   hCur.setTextFill(Color.web("#AAB4D4"));
+			Label hEval = new Label("평가손익"); hEval.setPrefWidth(120);  hEval.setTextFill(Color.web("#AAB4D4"));
+			rowHeader.getChildren().addAll(hName, hQty, hAvg, hCur, hEval);
+			rowHeader.setStyle("-fx-border-color: rgba(255,255,255,0.15); -fx-border-width: 0 0 1 0; -fx-padding: 0 0 4 0;");
+			holdingListContainer.getChildren().add(rowHeader);
+
+			// 종목별 상세 정산 내역 출력
+			for (java.util.Map.Entry<String, int[]> entry : currentHoldings.entrySet()) {
+				String name = entry.getKey();
+				int qty = entry.getValue()[0];
+				long avgPrice = entry.getValue()[1];
+				long curPrice = (stockListRef != null) ? stockListRef.getPrice(name) : avgPrice;
+				
+				long buyTotal = (long) qty * avgPrice;
+				long evalTotal = (long) qty * curPrice;
+				long stockProfit = evalTotal - buyTotal;
+				double stockRate = buyTotal > 0 ? ((double) stockProfit / buyTotal) * 100.0 : 0.0;
+
+				HBox row = new HBox(10);
+				row.setAlignment(Pos.CENTER_LEFT);
+				row.setPadding(new Insets(6, 4, 6, 4));
+				row.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-background-radius: 8;");
+
+				Label lName = new Label(name);       lName.setPrefWidth(140); lName.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 14)); lName.setTextFill(Color.WHITE);
+				Label lQty  = new Label(qty + " 주"); lQty.setPrefWidth(80);  lQty.setTextFill(Color.web("#FFF0B3"));
+				Label lAvg  = new Label(String.format("%,d원", avgPrice)); lAvg.setPrefWidth(110); lAvg.setTextFill(Color.web("#CCCCCC"));
+				Label lCur  = new Label(String.format("%,d원", curPrice)); lCur.setPrefWidth(110); lCur.setTextFill(Color.web("#7EDDFF"));
+
+				Label lEval = new Label();
+				if (stockProfit > 0) {
+					lEval.setText(String.format("+%.1f%%", stockRate));
+					lEval.setTextFill(Color.web("#FF5555"));
+				} else if (stockProfit < 0) {
+					lEval.setText(String.format("%.1f%%", stockRate));
+					lEval.setTextFill(Color.web("#5599FF"));
+				} else {
+					lEval.setText("0.0%");
+					lEval.setTextFill(Color.WHITE);
+				}
+				lEval.setPrefWidth(120);
+				lEval.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 14));
+
+				row.getChildren().addAll(lName, lQty, lAvg, lCur, lEval);
+				holdingListContainer.getChildren().add(row);
+			}
+		}
+
+		// 종목이 많아질 것에 대비한 스크롤 패널 구성
+		javafx.scene.control.ScrollPane scrollPane = new javafx.scene.control.ScrollPane(holdingListContainer);
+		scrollPane.setFitToWidth(true);
+		scrollPane.setPrefHeight(200);
+		scrollPane.setHbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);
+		scrollPane.setVbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.AS_NEEDED);
+		scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: rgba(255,255,255,0.1); -fx-border-radius: 12;");
+
+		// 5. 레이아웃 합성 및 오버레이 스크린 생성
+		VBox resultCard = new VBox(24, title, assetSummaryBox, holdingTitle, scrollPane);
 		resultCard.setAlignment(Pos.CENTER);
-		resultCard.setPadding(new Insets(50, 90, 50, 90));
-		resultCard.setMaxWidth(760);
+		resultCard.setPadding(new Insets(45, 60, 45, 60));
+		resultCard.setMaxWidth(800);
 		resultCard.setStyle(
-			"-fx-background-color: rgba(0,0,0,0.30);" +
+			"-fx-background-color: linear-gradient(to bottom right, rgba(10,20,70,0.95), rgba(70,0,90,0.95));" +
 			"-fx-background-radius: 34;" +
 			"-fx-border-color: rgba(255,255,255,0.35);" +
 			"-fx-border-radius: 34;" +
 			"-fx-border-width: 1.5;" +
-			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.55), 45, 0.35, 0, 0);"
+			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.65), 55, 0.35, 0, 0);"
 		);
 
-		Button exitBtn = new Button("종료");
+		Button exitBtn = new Button("게임 종료");
 		applyHoverEffect(exitBtn);
 		exitBtn.setStyle(
 			"-fx-background-color: linear-gradient(to right, #ff416c, #ff4b2b);" +
 			"-fx-text-fill: white;" +
-			"-fx-font-size: 24px;" +
+			"-fx-font-size: 22px;" +
 			"-fx-font-weight: bold;" +
 			"-fx-background-radius: 22;" +
-			"-fx-padding: 15 70 15 70;" +
+			"-fx-padding: 14 80 14 80;" +
 			"-fx-cursor: hand;" +
 			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 14, 0.3, 0, 3);"
 		);
@@ -423,9 +538,9 @@ public class Main extends Application {
 		VBox.setVgrow(topSpace, Priority.ALWAYS);
 		VBox.setVgrow(bottomSpace, Priority.ALWAYS);
 
-		VBox screen = new VBox(30, topSpace, resultCard, bottomSpace, exitBtn);
+		VBox screen = new VBox(24, topSpace, resultCard, bottomSpace, exitBtn);
 		screen.setAlignment(Pos.CENTER);
-		screen.setPadding(new Insets(70, 0, 70, 0));
+		screen.setPadding(new Insets(60, 0, 60, 0));
 		screen.setStyle(
 			"-fx-background-color: linear-gradient(to bottom right, " +
 				"#06124A 0%, #1A0B5E 45%, #5B006E 75%, #9B005C 100%);"
@@ -457,6 +572,179 @@ public class Main extends Application {
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
+	}
+	private void showFinalResultScreen() {
+		Label title = new Label("🎮 게임 종료 - 최종 투자 결과");
+		title.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 46));
+		title.setTextFill(Color.WHITE);
+
+		// 1. 자산 및 수익률 계산
+		long initialAsset = 10_000_000L; // 게임 시작 시 초기 자산 (1천만 원)
+		long currentCash = walletRef.getCash();
+		long totalStockValue = 0L;
+
+		// WalletPanel로부터 현재 보유 주식 목록을 가져와 현재가 기준으로 총액 계산
+		java.util.Map<String, int[]> currentHoldings = walletRef.getHoldings();
+		for (java.util.Map.Entry<String, int[]> entry : currentHoldings.entrySet()) {
+			String stockName = entry.getKey();
+			int quantity = entry.getValue()[0];
+			// 실시간 현재가를 가져오고, 없을 경우 평단가로 예외 처리
+			long currentPrice = (stockListRef != null) ? stockListRef.getPrice(stockName) : entry.getValue()[1];
+			totalStockValue += (long) quantity * currentPrice;
+		}
+
+		long finalTotalAsset = currentCash + totalStockValue;
+		long profitOrLoss = finalTotalAsset - initialAsset;
+		double profitRate = ((double) profitOrLoss / initialAsset) * 100.0;
+
+		// 2. 총자산 정보 레이아웃 구성
+		Label totalAssetLabel = new Label(String.format("최종 총 자산: %,d 원", finalTotalAsset));
+		totalAssetLabel.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 26));
+		totalAssetLabel.setTextFill(Color.web("#7EDDFF"));
+
+		Label detailsLabel = new Label(String.format("(현금: %,d 원 | 주식 평가액: %,d 원)", currentCash, totalStockValue));
+		detailsLabel.setFont(Font.font(uiFontFamily, FontWeight.NORMAL, 15));
+		detailsLabel.setTextFill(Color.web("#AAB4D4"));
+
+		// 3. 수익률 퍼센트 표시 (이득: 빨강 ▲ / 손해: 파랑 ▼)
+		Label rateLabel = new Label();
+		if (profitOrLoss > 0) {
+			rateLabel.setText(String.format("수익률: ▲+%.2f%% (+%,d 원)", profitRate, profitOrLoss));
+			rateLabel.setTextFill(Color.web("#FF5555")); // 상승 레드
+		} else if (profitOrLoss < 0) {
+			rateLabel.setText(String.format("수익률: ▼%.2f%% (%,d 원)", profitRate, profitOrLoss));
+			rateLabel.setTextFill(Color.web("#5599FF")); // 하락 블루
+		} else {
+			rateLabel.setText("수익률: 0.00% (변동 없음)");
+			rateLabel.setTextFill(Color.WHITE);
+		}
+		rateLabel.setFont(Font.font(uiFontFamily, FontWeight.EXTRA_BOLD, 28));
+
+		VBox assetSummaryBox = new VBox(8, totalAssetLabel, detailsLabel, rateLabel);
+		assetSummaryBox.setAlignment(Pos.CENTER);
+		assetSummaryBox.setPadding(new Insets(15));
+		assetSummaryBox.setStyle("-fx-background-color: rgba(255,255,255,0.05); -fx-background-radius: 16;");
+
+		// 4. 보유 주식 명세서 리스트 생성
+		Label holdingTitle = new Label("📋 최종 보유 주식 내역");
+		holdingTitle.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 18));
+		holdingTitle.setTextFill(Color.web("#FFE5A3"));
+
+		VBox holdingListContainer = new VBox(8);
+		holdingListContainer.setPadding(new Insets(10));
+
+		if (currentHoldings.isEmpty()) {
+			Label noHolding = new Label("종료 시점에 보유한 주식이 없습니다.");
+			noHolding.setFont(Font.font(uiFontFamily, 15));
+			noHolding.setTextFill(Color.web("#8899BB"));
+			holdingListContainer.getChildren().add(noHolding);
+		} else {
+			// 헤더 행 추가
+			HBox rowHeader = new HBox(10);
+			Label hName = new Label("종목명");   hName.setPrefWidth(140);  hName.setTextFill(Color.web("#AAB4D4"));
+			Label hQty  = new Label("보유량");   hQty.setPrefWidth(80);    hQty.setTextFill(Color.web("#AAB4D4"));
+			Label hAvg  = new Label("평균단가"); hAvg.setPrefWidth(110);   hAvg.setTextFill(Color.web("#AAB4D4"));
+			Label hCur  = new Label("현재가");   hCur.setPrefWidth(110);   hCur.setTextFill(Color.web("#AAB4D4"));
+			Label hEval = new Label("평가손익"); hEval.setPrefWidth(120);  hEval.setTextFill(Color.web("#AAB4D4"));
+			rowHeader.getChildren().addAll(hName, hQty, hAvg, hCur, hEval);
+			rowHeader.setStyle("-fx-border-color: rgba(255,255,255,0.15); -fx-border-width: 0 0 1 0; -fx-padding: 0 0 4 0;");
+			holdingListContainer.getChildren().add(rowHeader);
+
+			// 종목별 상세 정산 내역 출력
+			for (java.util.Map.Entry<String, int[]> entry : currentHoldings.entrySet()) {
+				String name = entry.getKey();
+				int qty = entry.getValue()[0];
+				long avgPrice = entry.getValue()[1];
+				long curPrice = (stockListRef != null) ? stockListRef.getPrice(name) : avgPrice;
+				
+				long buyTotal = (long) qty * avgPrice;
+				long evalTotal = (long) qty * curPrice;
+				long stockProfit = evalTotal - buyTotal;
+				double stockRate = buyTotal > 0 ? ((double) stockProfit / buyTotal) * 100.0 : 0.0;
+
+				HBox row = new HBox(10);
+				row.setAlignment(Pos.CENTER_LEFT);
+				row.setPadding(new Insets(6, 4, 6, 4));
+				row.setStyle("-fx-background-color: rgba(255,255,255,0.03); -fx-background-radius: 8;");
+
+				Label lName = new Label(name);       lName.setPrefWidth(140); lName.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 14)); lName.setTextFill(Color.WHITE);
+				Label lQty  = new Label(qty + " 주"); lQty.setPrefWidth(80);  lQty.setTextFill(Color.web("#FFF0B3"));
+				Label lAvg  = new Label(String.format("%,d원", avgPrice)); lAvg.setPrefWidth(110); lAvg.setTextFill(Color.web("#CCCCCC"));
+				Label lCur  = new Label(String.format("%,d원", curPrice)); lCur.setPrefWidth(110); lCur.setTextFill(Color.web("#7EDDFF"));
+
+				Label lEval = new Label();
+				if (stockProfit > 0) {
+					lEval.setText(String.format("+%.1f%%", stockRate));
+					lEval.setTextFill(Color.web("#FF5555"));
+				} else if (stockProfit < 0) {
+					lEval.setText(String.format("%.1f%%", stockRate));
+					lEval.setTextFill(Color.web("#5599FF"));
+				} else {
+					lEval.setText("0.0%");
+					lEval.setTextFill(Color.WHITE);
+				}
+				lEval.setPrefWidth(120);
+				lEval.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 14));
+
+				row.getChildren().addAll(lName, lQty, lAvg, lCur, lEval);
+				holdingListContainer.getChildren().add(row);
+			}
+		}
+
+		// 종목이 많아질 것에 대비한 스크롤 패널 구성
+		javafx.scene.control.ScrollPane scrollPane = new javafx.scene.control.ScrollPane(holdingListContainer);
+		scrollPane.setFitToWidth(true);
+		scrollPane.setPrefHeight(200);
+		scrollPane.setHbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.NEVER);
+		scrollPane.setVbarPolicy(javafx.scene.control.ScrollPane.ScrollBarPolicy.AS_NEEDED);
+		scrollPane.setStyle("-fx-background: transparent; -fx-background-color: transparent; -fx-border-color: rgba(255,255,255,0.1); -fx-border-radius: 12;");
+
+		// 5. 레이아웃 합성 및 오버레이 스크린 생성
+		VBox resultCard = new VBox(24, title, assetSummaryBox, holdingTitle, scrollPane);
+		resultCard.setAlignment(Pos.CENTER);
+		resultCard.setPadding(new Insets(45, 60, 45, 60));
+		resultCard.setMaxWidth(800);
+		resultCard.setStyle(
+			"-fx-background-color: linear-gradient(to bottom right, rgba(10,20,70,0.95), rgba(70,0,90,0.95));" +
+			"-fx-background-radius: 34;" +
+			"-fx-border-color: rgba(255,255,255,0.35);" +
+			"-fx-border-radius: 34;" +
+			"-fx-border-width: 1.5;" +
+			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.65), 55, 0.35, 0, 0);"
+		);
+
+		Button exitBtn = new Button("게임 종료");
+		applyHoverEffect(exitBtn);
+		exitBtn.setStyle(
+			"-fx-background-color: linear-gradient(to right, #ff416c, #ff4b2b);" +
+			"-fx-text-fill: white;" +
+			"-fx-font-size: 22px;" +
+			"-fx-font-weight: bold;" +
+			"-fx-background-radius: 22;" +
+			"-fx-padding: 14 80 14 80;" +
+			"-fx-cursor: hand;" +
+			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 14, 0.3, 0, 3);"
+		);
+
+		Region topSpace = new Region();
+		Region bottomSpace = new Region();
+		VBox.setVgrow(topSpace, Priority.ALWAYS);
+		VBox.setVgrow(bottomSpace, Priority.ALWAYS);
+
+		VBox screen = new VBox(24, topSpace, resultCard, bottomSpace, exitBtn);
+		screen.setAlignment(Pos.CENTER);
+		screen.setPadding(new Insets(60, 0, 60, 0));
+		screen.setStyle(
+			"-fx-background-color: linear-gradient(to bottom right, " +
+				"#06124A 0%, #1A0B5E 45%, #5B006E 75%, #9B005C 100%);"
+		);
+
+		StackPane resultOverlay = new StackPane(screen);
+		resultOverlay.setPrefSize(BASE_W, BASE_H);
+
+		appRoot.getChildren().add(resultOverlay);
+
+		exitBtn.setOnAction(e -> Platform.exit());
 	}
 
 	private void showDelistNotice(String stockName, long lostValue) {

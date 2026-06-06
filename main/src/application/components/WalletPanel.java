@@ -117,6 +117,11 @@ public class WalletPanel extends VBox {
     public long getCash() {
         return cash;
     }
+    
+    /*결과창 띄우기*/
+    public Map<String, int[]> getHoldings() {
+        return new java.util.LinkedHashMap<>(holdings);
+    }
 
     /**
      * 주식 매수 처리
