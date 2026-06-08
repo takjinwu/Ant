@@ -329,7 +329,7 @@ public class Main extends Application {
 		desc.setWrapText(true);
 
 		Button retryBtn = new Button("재도전");
-		Button resultBtn = new Button("끝내기");
+		Button resultBtn = new Button("결과보기");
 		applyHoverEffect(retryBtn);
 		applyHoverEffect(resultBtn);
 		String btnStyle =
@@ -520,25 +520,48 @@ public class Main extends Application {
 			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.65), 55, 0.35, 0, 0);"
 		);
 
-		Button exitBtn = new Button("게임 종료");
+		Button retryBtn = new Button("재도전");
+		Button exitBtn = new Button("종료하기");
+
+		applyHoverEffect(retryBtn);
 		applyHoverEffect(exitBtn);
+
+		String finalBtnStyle =
+		    "-fx-background-color: rgba(255,255,255,0.22);" +
+		    "-fx-text-fill: white;" +
+		    "-fx-font-size: 22px;" +
+		    "-fx-font-weight: bold;" +
+		    "-fx-background-radius: 22;" +
+		    "-fx-padding: 14 60 14 60;" +
+		    "-fx-border-color: rgba(255,255,255,0.38);" +
+		    "-fx-border-radius: 22;" +
+		    "-fx-cursor: hand;";
+
+		retryBtn.setStyle(finalBtnStyle);
+
 		exitBtn.setStyle(
-			"-fx-background-color: linear-gradient(to right, #ff416c, #ff4b2b);" +
-			"-fx-text-fill: white;" +
-			"-fx-font-size: 22px;" +
-			"-fx-font-weight: bold;" +
-			"-fx-background-radius: 22;" +
-			"-fx-padding: 14 80 14 80;" +
-			"-fx-cursor: hand;" +
-			"-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 14, 0.3, 0, 3);"
+		    "-fx-background-color: linear-gradient(to right, #ff416c, #ff4b2b);" +
+		    "-fx-text-fill: white;" +
+		    "-fx-font-size: 22px;" +
+		    "-fx-font-weight: bold;" +
+		    "-fx-background-radius: 22;" +
+		    "-fx-padding: 14 60 14 60;" +
+		    "-fx-cursor: hand;" +
+		    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.35), 14, 0.3, 0, 3);"
 		);
+
+		HBox finalButtons = new HBox(20, retryBtn, exitBtn);
+		finalButtons.setAlignment(Pos.CENTER);
 
 		Region topSpace = new Region();
 		Region bottomSpace = new Region();
 		VBox.setVgrow(topSpace, Priority.ALWAYS);
 		VBox.setVgrow(bottomSpace, Priority.ALWAYS);
 
-		VBox screen = new VBox(24, topSpace, resultCard, bottomSpace, exitBtn);
+		HBox bottomButtons = new HBox(18, retryBtn, exitBtn);
+		bottomButtons.setAlignment(Pos.CENTER);
+
+		VBox screen = new VBox(24, topSpace, resultCard, bottomSpace, bottomButtons);
 		screen.setAlignment(Pos.CENTER);
 		screen.setPadding(new Insets(60, 0, 60, 0));
 		screen.setStyle(
@@ -550,7 +573,7 @@ public class Main extends Application {
 		resultOverlay.setPrefSize(BASE_W, BASE_H);
 
 		appRoot.getChildren().add(resultOverlay);
-
+		retryBtn.setOnAction(e -> restartGame());
 		exitBtn.setOnAction(e -> Platform.exit());
 	}
 
