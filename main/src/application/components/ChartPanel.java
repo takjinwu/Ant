@@ -37,7 +37,7 @@ public class ChartPanel extends VBox {
     private static final int PAD_R = 6;
     private static final double VOL_RATIO = 0.22;
     private static final double HEAD_H = 72;
-    private static final int VISIBLE_CANDLES = 30;  // 화면에 표시할 최대 캔들 수
+    private static final int VISIBLE_CANDLES = 24;  // 화면에 표시할 최대 캔들 수
     private static final double LIMIT_RATE = 0.30;  // 상한가/하한가 ±30%
 
     private static final double[][] SAMPLE_SERIES = {
@@ -306,7 +306,7 @@ public class ChartPanel extends VBox {
         java.util.Random r = new java.util.Random();
         // effect 100 → +10% 편향. 이전 값(0.004)은 effect 70만 돼도 ±30% 상한가에
         // 항상 도달해 등락률이 고정되고 너무 극단적이었음.
-        double bias   = effect * 0.001;
+        double bias   = effect * 0.0012;
         double drift  = bias + (r.nextDouble() - 0.5) * 0.04;   // 랜덤 노이즈 ±2% → 등락률에 변동성 부여
         double open   = prevClose;
         double close  = open * (1 + drift);
@@ -373,7 +373,7 @@ public class ChartPanel extends VBox {
             double[] last      = stockData[stockData.length - 1];
             double   prevClose = last[3];
 
-            double bias  = effect * 0.001;   // effect 100 → +10% (이전 0.004는 항상 ±30%에 도달해 극단적)
+            double bias  = effect * 0.0012;   // effect 100 → +10% (이전 0.004는 항상 ±30%에 도달해 극단적)
             double drift = bias + (r.nextDouble() - 0.5) * 0.04;   // ±2% 랜덤 노이즈로 등락률 변동
             double open  = prevClose;
             double close = open  * (1 + drift);
@@ -501,7 +501,7 @@ public class ChartPanel extends VBox {
         double cur = price * (0.80 + r.nextDouble() * 0.30);
         for (int i = 0; i < n; i++) {
             double open = cur;
-            double drift = (r.nextDouble() - 0.45) * 0.06;
+            double drift = (r.nextDouble() - 0.45) * 0.15;
             double close = open * (1 + drift);
             double high = Math.max(open, close) * (1 + r.nextDouble() * 0.025);
             double low = Math.min(open, close) * (1 - r.nextDouble() * 0.025);

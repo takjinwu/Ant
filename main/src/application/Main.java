@@ -59,7 +59,7 @@ public class Main extends Application {
 	private static final double BOTTOM_H = 260;
 	private static final double GAP = 18;
 	private static final double COLUMN_H = CHART_H + GAP + BOTTOM_H;
-	private double currentVolume = 0.3;
+	private double currentVolume = 0.0;
 	private StackPane appRoot;
 	private Pane responsiveRoot;
 	private Group scaledGroup;
