@@ -159,6 +159,14 @@ public class Main extends Application {
 					if (orderRef != null) {
 						orderRef.refreshPrice(stockListRef);
 					}
+					// 주가 변동 시 WalletPanel 손익률 갱신
+					if (walletRef != null) {
+						java.util.Map<String, Long> latestPrices = new java.util.HashMap<>();
+						for (String name : stockListRef.getStocks().keySet()) {
+							latestPrices.put(name, stockListRef.getPrice(name));
+						}
+						walletRef.updatePrices(latestPrices);
+					}
 				} else {
 					chartPanel.addCandle(effect);
 				}

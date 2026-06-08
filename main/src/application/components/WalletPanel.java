@@ -13,6 +13,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 
 import java.text.NumberFormat;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -21,7 +22,7 @@ import java.util.function.Consumer;
 /**
  * WalletPanel
  * ─ 현재 보유 금액과 보유 주식 목록을 표시하는 패널
- * ─ PanelCard 스타일(반투명 카드)을 직접 인라인으로 구현
+ * ─ 주가 변동 시 updatePrices() 를 호출하면 손익률이 실시간으로 갱신됨
  */
 public class WalletPanel extends VBox {
 
@@ -33,6 +34,8 @@ public class WalletPanel extends VBox {
     private long cash = 10_000_000L;                        // 초기 보유 현금 (1천만 원)
     private final Map<String, int[]> holdings =             // 종목명 → [수량, 평균단가]
             new LinkedHashMap<>();
+    private final Map<String, Long> currentPrices =         // 종목명 → 현재가
+            new HashMap<>();
 
     // ── UI 요소 ────────────────────────────────────────────
     private final Label cashValueLabel;
@@ -117,16 +120,35 @@ public class WalletPanel extends VBox {
     public long getCash() {
         return cash;
     }
-    
-    /*결과창 띄우기*/
+
+    /** 결과창 띄우기 */
     public Map<String, int[]> getHoldings() {
         return new java.util.LinkedHashMap<>(holdings);
     }
 
     /**
-     * 주식 매수 처리
+     * 주가 변동 시 외부에서 호출 — 현재가를 갱신하고 손익률을 다시 그립니다.
+     * @param prices 종목명 → 현재가 맵 (보유하지 않은 종목이 포함돼도 무방)
+     */
+    public void updatePrices(Map<String, Long> prices) {
+        currentPrices.putAll(prices);
+        refresh();
+    }
+
+    /**
+     * 단일 종목 현재가 갱신 — 해당 종목만 업데이트하고 UI를 다시 그립니다.
      * @param stockName 종목명
-     * @param quantity  수량
+     * @param price     현재가
+     */
+    public void updatePrice(String stockName, long price) {
+        currentPrices.put(stockName, price);
+        refresh();
+    }
+
+    /**
+     * 주식 매수 처리
+     * @param stockName     종목명
+     * @param quantity      수량
      * @param pricePerShare 주당 가격
      * @return 매수 성공 여부
      */
@@ -137,13 +159,16 @@ public class WalletPanel extends VBox {
         cash -= totalCost;
 
         if (holdings.containsKey(stockName)) {
-            int[]  info    = holdings.get(stockName);
-            long   prevTotal = (long) info[0] * info[1];
+            int[] info     = holdings.get(stockName);
+            long  prevTotal = (long) info[0] * info[1];
             info[0] += quantity;
             info[1] = (int) ((prevTotal + totalCost) / info[0]); // 평균단가 갱신
         } else {
             holdings.put(stockName, new int[]{quantity, (int) pricePerShare});
         }
+
+        // 매수 시점 가격을 현재가로도 등록 (첫 매수라면)
+        currentPrices.putIfAbsent(stockName, pricePerShare);
 
         refresh();
         return true;
@@ -151,8 +176,8 @@ public class WalletPanel extends VBox {
 
     /**
      * 주식 매도 처리
-     * @param stockName 종목명
-     * @param quantity  수량
+     * @param stockName     종목명
+     * @param quantity      수량
      * @param pricePerShare 주당 가격
      * @return 매도 성공 여부
      */
@@ -163,7 +188,10 @@ public class WalletPanel extends VBox {
 
         cash += (long) quantity * pricePerShare;
         info[0] -= quantity;
-        if (info[0] == 0) holdings.remove(stockName);
+        if (info[0] == 0) {
+            holdings.remove(stockName);
+            currentPrices.remove(stockName);
+        }
 
         refresh();
         return true;
@@ -183,6 +211,7 @@ public class WalletPanel extends VBox {
         int[] info = holdings.get(stockName);
         long lostValue = (long) info[0] * info[1];
         holdings.remove(stockName);
+        currentPrices.remove(stockName);
         refresh();
         return lostValue;
     }
@@ -213,32 +242,77 @@ public class WalletPanel extends VBox {
     }
 
     private HBox buildStockRow(String name, int[] info) {
+        int  qty       = info[0];
+        long avgPrice  = info[1];
+        long curPrice  = currentPrices.getOrDefault(name, (long) avgPrice); // 현재가 없으면 평균단가
+
+        long   pnlAmount = (curPrice - avgPrice) * qty;   // 손익금액
+        double pnlRate   = avgPrice == 0 ? 0.0
+                         : (curPrice - avgPrice) * 100.0 / avgPrice; // 손익률(%)
+
+        // ── 종목명 (왼쪽) ──
         Label nameLabel = new Label(name);
         nameLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
         nameLabel.setTextFill(Color.web("#E0E8FF"));
 
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        Label qtyLabel = new Label(info[0] + "주");
+        // ── 수량 + 평균단가 (오른쪽 위) ──
+        Label qtyLabel = new Label(qty + "주");
         qtyLabel.setFont(Font.font("SUIT", FontWeight.BOLD, 13));
         qtyLabel.setTextFill(Color.web("#FFD580"));
 
-        Label avgLabel = new Label("평균 " + formatMoney(info[1]) + "원");
+        Label avgLabel = new Label("평균 " + formatMoney(avgPrice) + "원");
         avgLabel.setFont(Font.font("SUIT", 12));
         avgLabel.setTextFill(Color.web("#8899BB"));
 
-        VBox rightBox = new VBox(2, qtyLabel, avgLabel);
+        // ── 손익 표시 ──
+        String sign       = pnlAmount >= 0 ? "▲ +" : "▼ ";
+        String pnlText    = sign + formatMoney(pnlAmount) + "원  "
+                          + (pnlAmount >= 0 ? "+" : "") + String.format("%.2f", pnlRate) + "%";
+        Label  pnlLabel   = new Label(pnlText);
+        pnlLabel.setFont(Font.font("SUIT", FontWeight.EXTRA_BOLD, 12));
+
+        String baseStyle;
+        if (pnlAmount > 0) {
+            pnlLabel.setTextFill(Color.web("#FF3333"));
+            pnlLabel.setStyle(
+                "-fx-effect: dropshadow(gaussian, rgba(255,60,60,0.75), 10, 0.4, 0, 0);"
+            );
+            baseStyle = "-fx-background-color: rgba(255,60,60,0.18);" +
+                        "-fx-background-radius: 12;" +
+                        "-fx-border-color: rgba(255,80,80,0.55);" +
+                        "-fx-border-radius: 12;" +
+                        "-fx-border-width: 1;" +
+                        "-fx-cursor: hand;";
+        } else if (pnlAmount < 0) {
+            pnlLabel.setTextFill(Color.web("#33AAFF"));
+            pnlLabel.setStyle(
+                "-fx-effect: dropshadow(gaussian, rgba(50,150,255,0.75), 10, 0.4, 0, 0);"
+            );
+            baseStyle = "-fx-background-color: rgba(50,130,255,0.18);" +
+                        "-fx-background-radius: 12;" +
+                        "-fx-border-color: rgba(60,140,255,0.55);" +
+                        "-fx-border-radius: 12;" +
+                        "-fx-border-width: 1;" +
+                        "-fx-cursor: hand;";
+        } else {
+            pnlLabel.setTextFill(Color.web("#AAAAAA"));
+            pnlLabel.setStyle("");
+            baseStyle = "-fx-background-color: rgba(255,255,255,0.06);" +
+                        "-fx-background-radius: 12;" +
+                        "-fx-cursor: hand;";
+        }
+
+        VBox rightBox = new VBox(2, qtyLabel, avgLabel, pnlLabel);
         rightBox.setAlignment(Pos.CENTER_RIGHT);
+
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
 
         HBox row = new HBox(8, nameLabel, spacer, rightBox);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(8, 12, 8, 12));
-        row.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.06);" +
-            "-fx-background-radius: 12;" +
-            "-fx-cursor: hand;"
-        );
+
+        row.setStyle(baseStyle);
 
         row.setOnMouseEntered(e -> row.setStyle(
             "-fx-background-color: rgba(231,76,60,0.16);" +
@@ -248,11 +322,7 @@ public class WalletPanel extends VBox {
             "-fx-cursor: hand;"
         ));
 
-        row.setOnMouseExited(e -> row.setStyle(
-            "-fx-background-color: rgba(255,255,255,0.06);" +
-            "-fx-background-radius: 12;" +
-            "-fx-cursor: hand;"
-        ));
+        row.setOnMouseExited(e -> row.setStyle(baseStyle));
 
         row.setOnMouseClicked(e -> {
             if (onHoldingSelected != null) {
