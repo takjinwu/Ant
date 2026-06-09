@@ -271,11 +271,17 @@ public class Main extends Application {
 		title.setTextFill(Color.WHITE);
 
 		Label desc = new Label(
-			"뉴스를 확인하고 주식을 매수·매도하여\n" +
-			"21턴 동안 최대한 높은 자산을 만들어보세요.\n\n" +
-			"뉴스는 1분마다 자동으로 변경되며,\n" +
-			"SKIP 버튼으로 바로 다음 턴으로 넘길 수 있습니다."
-		);
+			    "뉴스를 확인하고 주식을 매수·매도하여\n" +
+			    "21턴 동안 최대한 높은 자산을 만들어보세요.\n\n" +
+
+			    "뉴스는 1분마다 자동으로 변경되며,\n" +
+			    "SKIP 버튼을 눌러 다음 턴으로 넘어갈 수 있습니다.\n\n" +
+
+			    "※ 기업명은 실제 기업을 참고했으나\n" +
+			    "게임 내 내용은 실제와 무관한 가상 시나리오입니다.\n\n" +
+			    "※ 일부 배경음악은 외부 음원을 사용했습니다.\n\n" +
+			    "※ 본 게임은 비상업적 교육 및 프로젝트 목적으로 제작되었습니다."
+			);
 		desc.setFont(Font.font(uiFontFamily, FontWeight.BOLD, 22));
 		desc.setTextFill(Color.web("#DDE8FF"));
 		desc.setAlignment(Pos.CENTER);
